@@ -34,3 +34,25 @@ model AuditLog {
   userId    String
   timestamp DateTime @default(now())
 }
+
+model SoilTestCenter {
+  id        String   @id @default(uuid())
+  name      String
+  location  String
+  agentId   String
+  agent     User     @relation(fields: [agentId], references: [id])
+  requests  SoilTestRequest[]
+  createdAt DateTime @default(now())
+}
+
+model SoilTestRequest {
+  id        String   @id @default(uuid())
+  farmerId  String
+  farmer    User     @relation(fields: [farmerId], references: [id])
+  centerId  String
+  center    SoilTestCenter @relation(fields: [centerId], references: [id])
+  status    String   @default("PENDING")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
