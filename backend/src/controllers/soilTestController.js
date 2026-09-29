@@ -5,7 +5,15 @@ const prisma = new PrismaClient();
 exports.createCenter = async (req, res) => {
   try {
     const { name, location, agentId } = req.body;
-    // In a real app, agentId might come from req.user.id after auth
+    
+    // Check if agent already has a center
+    const existing = await prisma.soilTestCenter.findUnique({
+      where: { agentId }
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'You already have a registered test center.' });
+    }
+
     const center = await prisma.soilTestCenter.create({
       data: {
         name,
