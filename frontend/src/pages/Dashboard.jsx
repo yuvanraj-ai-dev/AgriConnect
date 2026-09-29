@@ -69,7 +69,13 @@ export default function Dashboard({ user }) {
                   <h4 className="text-lg font-bold text-agriText mb-2">{mod.title}</h4>
                   <p className="text-gray-600 text-sm mb-4">{mod.desc}</p>
                 </div>
-                <button className="self-start text-agriGreen font-bold hover:underline">
+                <button 
+                  onClick={() => {
+                    if (mod.id === 'ST') window.location.href = '/soil-testing';
+                    if (mod.id === 'ST_CENTER') window.location.href = '/test-center';
+                  }}
+                  className="self-start text-agriGreen font-bold hover:underline"
+                >
                   Open Module &rarr;
                 </button>
               </div>

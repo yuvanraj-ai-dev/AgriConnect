@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import FarmerSoilTest from './pages/FarmerSoilTest';
+import AgentSoilTest from './pages/AgentSoilTest';
 import { useEffect, useState } from 'react';
 import api from './services/api';
 
@@ -56,6 +58,8 @@ function App() {
             <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
             <Route path="/register" element={!user ? <Register /> : <Navigate to="/dashboard" />} />
             <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
+            <Route path="/soil-testing" element={user ? <FarmerSoilTest user={user} /> : <Navigate to="/login" />} />
+            <Route path="/test-center" element={user ? <AgentSoilTest user={user} /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
           </Routes>
         </main>
