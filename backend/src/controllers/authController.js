@@ -22,7 +22,7 @@ const register = async (req, res) => {
       data: {
         email,
         passwordHash,
-        roles: JSON.stringify(roles),
+        roles,
         active: true, // Auto-approve as per user request
       },
     });
@@ -52,10 +52,8 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const parsedRoles = JSON.parse(user.roles);
-
     const token = jwt.sign(
-      { id: user.id, email: user.email, roles: parsedRoles },
+      { id: user.id, email: user.email, roles: user.roles },
       process.env.JWT_SECRET,
       { expiresIn: '1h' } // 60 min inactivity timeout
     );
@@ -65,7 +63,7 @@ const login = async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        roles: parsedRoles,
+        roles: user.roles,
       }
     });
   } catch (error) {
@@ -83,10 +81,7 @@ const getMe = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.status(200).json({
-      ...user,
-      roles: JSON.parse(user.roles)
-    });
+    res.status(200).json(user);
   } catch (error) {
     console.error('Get me error:', error);
     res.status(500).json({ message: 'Internal server error' });
