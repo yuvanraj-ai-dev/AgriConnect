@@ -26,7 +26,7 @@ exports.getCenters = async (req, res) => {
     const centers = await prisma.soilTestCenter.findMany({
       include: {
         agent: {
-          select: { name: true, email: true } // Assuming 'name' might exist, fallback to email
+          select: { email: true } // User model only has email
         }
       }
     });
