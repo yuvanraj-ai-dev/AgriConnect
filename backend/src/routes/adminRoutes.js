@@ -19,6 +19,8 @@ router.post('/reset-db', async (req, res) => {
     await prisma.notification.deleteMany({});
     await prisma.soilTestRequest.deleteMany({});
     await prisma.soilTestCenter.deleteMany({});
+    await prisma.product.deleteMany({});
+    await prisma.machinery.deleteMany({});
     await prisma.auditLog.deleteMany({});
     await prisma.user.deleteMany({});
 

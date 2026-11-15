@@ -37,11 +37,11 @@ export default function Dashboard({ user }) {
     <div className="max-w-6xl mx-auto mt-6">
       <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-agriBorder pb-4">
         <h2 className="text-2xl font-bold text-agriText">Welcome, {user.email.split('@')[0]}</h2>
-        
+
         {user.roles.length > 1 && (
           <div className="mt-4 md:mt-0 flex items-center space-x-3">
             <span className="text-gray-600 font-medium">Switch View:</span>
-            <select 
+            <select
               className="p-2 border border-agriBorder rounded bg-white text-agriText focus:outline-none focus:border-agriGreen"
               value={activeRoleView}
               onChange={(e) => setActiveRoleView(e.target.value)}
@@ -56,7 +56,7 @@ export default function Dashboard({ user }) {
 
       <div className="mb-6">
         <h3 className="text-xl font-bold text-agriGreen mb-4">{activeRoleView.replace('_', ' ')} Dashboard</h3>
-        
+
         {currentModules.length === 0 ? (
           <div className="bg-white p-6 border border-agriBorder rounded text-center text-gray-500">
             No modules available for this role yet.
@@ -64,15 +64,26 @@ export default function Dashboard({ user }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {currentModules.map(mod => (
-              <div key={mod.id} className="bg-white border border-agriBorder rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-between">
+              <div
+                key={mod.id}
+                onClick={() => {
+                  if (mod.id === 'ST') window.location.href = '/soil-testing';
+                  if (mod.id === 'ST_CENTER') window.location.href = '/test-center';
+                  if (mod.id === 'MK_VENDOR') window.location.href = '/vendor/shop';
+                  if (mod.id === 'EQ_OWNER') window.location.href = '/vendor/equipment';
+                }}
+                className="bg-white border border-agriBorder rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-between"
+              >
                 <div>
                   <h4 className="text-lg font-bold text-agriText mb-2">{mod.title}</h4>
                   <p className="text-gray-600 text-sm mb-4">{mod.desc}</p>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     if (mod.id === 'ST') window.location.href = '/soil-testing';
                     if (mod.id === 'ST_CENTER') window.location.href = '/test-center';
+                    if (mod.id === 'MK_VENDOR') window.location.href = '/vendor/shop';
+                    if (mod.id === 'EQ_OWNER') window.location.href = '/vendor/equipment';
                   }}
                   className="self-start text-agriGreen font-bold hover:underline"
                 >

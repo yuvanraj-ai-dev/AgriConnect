@@ -17,6 +17,8 @@ model User {
   updatedAt    DateTime @updatedAt
   soilTestCenter   SoilTestCenter?
   soilTestRequests SoilTestRequest[]
+  products         Product[]
+  machinery        Machinery[]
 }
 
 // Minimal models for now, we will add more for other modules later.
@@ -58,3 +60,40 @@ model SoilTestRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model Product {
+  id            String   @id @default(uuid())
+  vendorId      String
+  vendor        User     @relation(fields: [vendorId], references: [id])
+  title         String
+  category      String   // FERTILIZER, SEED, PESTICIDE, TOOL, BIO_ORGANIC, OTHER
+  brand         String?
+  description   String?
+  price         Float
+  unit          String   // e.g. "50kg Bag", "1kg Packet", "Liter", "Piece"
+  stockQuantity Int      @default(0)
+  safetyWarning String?  // Specific warning/safety instructions (BR-MK-02, REQ-MK-10)
+  imageUrl      String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Machinery {
+  id                String   @id @default(uuid())
+  ownerId           String
+  owner             User     @relation(fields: [ownerId], references: [id])
+  name              String
+  type              String   // Tractor, Harvester, Power Tiller, Rotavator, Sprayer, Seed Drill, Other
+  dailyRate         Float    // Rental rate per day (minimum 1 day / 8 hours per BR-EQ-01)
+  securityDeposit   Float    @default(0) // Security deposit terms (BR-EQ-02)
+  location          String
+  operationalStatus String   @default("AVAILABLE") // AVAILABLE, UNDER_MAINTENANCE, RENTED
+  instantApproval   Boolean  @default(false) // REQ-EQ-01, REQ-EQ-10
+  specifications    String?  // Horsepower, model year, fuel policy, driver included
+  imageUrl          String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+

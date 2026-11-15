@@ -4,6 +4,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import FarmerSoilTest from './pages/FarmerSoilTest';
 import AgentSoilTest from './pages/AgentSoilTest';
+import VendorShop from './pages/VendorShop';
 import { useEffect, useState } from 'react';
 import api from './services/api';
 
@@ -60,6 +61,8 @@ function App() {
             <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
             <Route path="/soil-testing" element={user ? <FarmerSoilTest user={user} /> : <Navigate to="/login" />} />
             <Route path="/test-center" element={user ? <AgentSoilTest user={user} /> : <Navigate to="/login" />} />
+            <Route path="/vendor/shop" element={user ? <VendorShop user={user} /> : <Navigate to="/login" />} />
+            <Route path="/vendor/equipment" element={user ? <VendorShop user={user} initialTab="machinery" /> : <Navigate to="/login" />} />
             <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
           </Routes>
         </main>
