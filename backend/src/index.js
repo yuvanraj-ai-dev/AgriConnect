@@ -64,11 +64,17 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Routes
+// Routes (with /api)
 app.use('/api/auth', authRoutes);
 app.use('/api/soil-test', soilTestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/vendor', vendorRoutes);
+
+// Fallback routes (without /api, in case VITE_API_URL is configured without /api)
+app.use('/auth', authRoutes);
+app.use('/soil-test', soilTestRoutes);
+app.use('/admin', adminRoutes);
+app.use('/vendor', vendorRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK' });
