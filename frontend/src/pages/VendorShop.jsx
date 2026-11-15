@@ -184,6 +184,7 @@ export default function VendorShop({ user, initialTab }) {
 
     try {
       setActionLoading(true);
+      setError(null);
       if (editingProduct) {
         const res = await api.put(`/vendor/products/${editingProduct.id}`, productForm);
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? res.data : p));
@@ -197,8 +198,12 @@ export default function VendorShop({ user, initialTab }) {
       // Refresh stats
       fetchData();
     } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || 'Failed to save product.');
+      console.error('Error saving product:', err);
+      const errMsg = err.response?.data?.error
+        ? `${err.response.data.error}${err.response.data.detail ? ': ' + err.response.data.detail : ''}`
+        : (err.response?.data?.message || err.message || 'Failed to save product.');
+      setError(errMsg);
+      alert(errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -276,8 +281,12 @@ export default function VendorShop({ user, initialTab }) {
       setShowMachineryModal(false);
       fetchData();
     } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || 'Failed to save machinery listing.');
+      console.error('Error saving machinery:', err);
+      const errMsg = err.response?.data?.error
+        ? `${err.response.data.error}${err.response.data.detail ? ': ' + err.response.data.detail : ''}`
+        : (err.response?.data?.message || err.message || 'Failed to save machinery listing.');
+      setError(errMsg);
+      alert(errMsg);
     } finally {
       setActionLoading(false);
     }
@@ -818,6 +827,13 @@ export default function VendorShop({ user, initialTab }) {
               </button>
             </div>
 
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-xs flex items-start gap-2">
+                <span className="text-red-500 font-bold">⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
+
             <form onSubmit={handleProductSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">
@@ -991,6 +1007,13 @@ export default function VendorShop({ user, initialTab }) {
                 &times;
               </button>
             </div>
+
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-xs flex items-start gap-2">
+                <span className="text-red-500 font-bold">⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
 
             <form onSubmit={handleMachinerySubmit} className="space-y-4">
               <div>

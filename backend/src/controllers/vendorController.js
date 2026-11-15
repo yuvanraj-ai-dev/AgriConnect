@@ -20,12 +20,12 @@ exports.createProduct = async (req, res) => {
       imageUrl
     } = req.body;
 
-    if (!title || !category || price === undefined || !unit) {
-      return res.status(400).json({ error: 'Title, category, price, and unit are required.' });
+    if (!title || !category || price === undefined || price === '' || !unit) {
+      return res.status(400).json({ error: 'Title, category, price, and packaging unit are required.' });
     }
 
     const numericPrice = parseFloat(price);
-    const numericStock = parseInt(stockQuantity || 0, 10);
+    const numericStock = parseInt(stockQuantity !== undefined && stockQuantity !== '' ? stockQuantity : 0, 10);
 
     if (isNaN(numericPrice) || numericPrice < 0) {
       return res.status(400).json({ error: 'Price must be a valid positive number.' });
@@ -33,6 +33,15 @@ exports.createProduct = async (req, res) => {
 
     if (isNaN(numericStock) || numericStock < 0) {
       return res.status(400).json({ error: 'Stock quantity cannot be negative.' });
+    }
+
+    // Verify vendor user exists in database
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'User session invalid. Please log out and log in again.' });
     }
 
     const product = await prisma.product.create({
@@ -203,12 +212,12 @@ exports.createMachinery = async (req, res) => {
       imageUrl
     } = req.body;
 
-    if (!name || !type || dailyRate === undefined || !location) {
+    if (!name || !type || dailyRate === undefined || dailyRate === '' || !location) {
       return res.status(400).json({ error: 'Name, machinery type, daily rate, and location are required.' });
     }
 
     const numericDailyRate = parseFloat(dailyRate);
-    const numericDeposit = parseFloat(securityDeposit || 0);
+    const numericDeposit = parseFloat(securityDeposit !== undefined && securityDeposit !== '' ? securityDeposit : 0);
 
     if (isNaN(numericDailyRate) || numericDailyRate <= 0) {
       return res.status(400).json({ error: 'Daily rate must be a valid positive amount.' });
@@ -216,6 +225,15 @@ exports.createMachinery = async (req, res) => {
 
     if (isNaN(numericDeposit) || numericDeposit < 0) {
       return res.status(400).json({ error: 'Security deposit cannot be negative.' });
+    }
+
+    // Verify owner user exists in database
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id }
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'User session invalid. Please log out and log in again.' });
     }
 
     const machinery = await prisma.machinery.create({

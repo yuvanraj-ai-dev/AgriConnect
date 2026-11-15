@@ -23,10 +23,24 @@ const requireRole = (roles) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
     
+    // Normalize user roles (handles array, stringified array, or single string)
+    let userRoles = req.user.roles || [];
+    if (typeof userRoles === 'string') {
+      try {
+        const parsed = JSON.parse(userRoles);
+        userRoles = Array.isArray(parsed) ? parsed : [userRoles];
+      } catch (e) {
+        userRoles = [userRoles];
+      }
+    } else if (!Array.isArray(userRoles)) {
+      userRoles = [userRoles];
+    }
+    req.user.roles = userRoles;
+
     // Check if user has any of the required roles
-    const hasRole = req.user.roles.some((role) => roles.includes(role));
+    const hasRole = userRoles.some((role) => roles.includes(role));
     if (!hasRole) {
-      console.warn(`[RBAC] User ${req.user.id} denied access. Required: ${roles.join(',')}, Has: ${req.user.roles.join(',')}`);
+      console.warn(`[RBAC] User ${req.user.id} denied access. Required: ${roles.join(',')}, Has: ${userRoles.join(',')}`);
       return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
     }
     
