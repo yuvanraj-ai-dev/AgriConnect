@@ -38,7 +38,7 @@ If you want your own copy, click **Fork** on GitHub first, then clone your fork.
    | Field | Value |
    |---|---|
    | **Root Directory** | `backend` |
-   | **Build Command** | `rm -rf node_modules && npm install && npx prisma generate && npx prisma db push` |
+   | **Build Command** | `rm -rf node_modules && npm install && npx prisma generate && npx prisma db push --accept-data-loss` |
    | **Start Command** | `npm start` |
    | **Instance Type** | Free |
 

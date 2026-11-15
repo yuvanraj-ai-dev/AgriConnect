@@ -199,9 +199,15 @@ export default function VendorShop({ user, initialTab }) {
       fetchData();
     } catch (err) {
       console.error('Error saving product:', err);
-      const errMsg = err.response?.data?.error
-        ? `${err.response.data.error}${err.response.data.detail ? ': ' + err.response.data.detail : ''}`
-        : (err.response?.data?.message || err.message || 'Failed to save product.');
+      const reqUrl = `${err.config?.baseURL || ''}${err.config?.url || ''}`;
+      const reqMethod = (err.config?.method || 'POST').toUpperCase();
+      const status = err.response?.status || 'Network Error';
+      const serverDetail = err.response?.data?.error 
+        || err.response?.data?.message 
+        || (typeof err.response?.data === 'string' ? err.response.data : null)
+        || err.message;
+      
+      const errMsg = `[Error ${status}] Failed to save product on ${reqMethod} ${reqUrl}: ${serverDetail}`;
       setError(errMsg);
       alert(errMsg);
     } finally {
@@ -282,9 +288,15 @@ export default function VendorShop({ user, initialTab }) {
       fetchData();
     } catch (err) {
       console.error('Error saving machinery:', err);
-      const errMsg = err.response?.data?.error
-        ? `${err.response.data.error}${err.response.data.detail ? ': ' + err.response.data.detail : ''}`
-        : (err.response?.data?.message || err.message || 'Failed to save machinery listing.');
+      const reqUrl = `${err.config?.baseURL || ''}${err.config?.url || ''}`;
+      const reqMethod = (err.config?.method || 'POST').toUpperCase();
+      const status = err.response?.status || 'Network Error';
+      const serverDetail = err.response?.data?.error 
+        || err.response?.data?.message 
+        || (typeof err.response?.data === 'string' ? err.response.data : null)
+        || err.message;
+      
+      const errMsg = `[Error ${status}] Failed to save machinery on ${reqMethod} ${reqUrl}: ${serverDetail}`;
       setError(errMsg);
       alert(errMsg);
     } finally {
@@ -360,6 +372,9 @@ export default function VendorShop({ user, initialTab }) {
           <p className="text-sm text-gray-500">
             List and manage your agricultural products (fertilizers, seeds, inputs) and rental machinery.
           </p>
+          <div className="text-[11px] text-gray-400 mt-1 font-mono">
+            Backend API: {api.defaults.baseURL || 'http://localhost:5000/api'}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
