@@ -2,6 +2,7 @@ const express = require('express');
 const { db } = require('../db');
 const { route, check } = require('../http');
 const { authenticateToken } = require('../middleware/authMiddleware');
+const { emailMode } = require('../mailer');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -12,7 +13,7 @@ router.get('/notifications', route(async (req, res) => {
     db.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 50 }),
     db.notification.count({ where: { userId, read: false } }),
   ]);
-  res.json({ items, unread });
+  res.json({ items, unread, emailMode: emailMode() });
 }));
 
 router.patch('/notifications/read', route(async (req, res) => {

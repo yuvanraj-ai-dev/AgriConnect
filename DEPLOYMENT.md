@@ -25,8 +25,12 @@ The existing deployment uses Vercel for React, Render for the Express API, and N
 | `SMTP_USER`, `SMTP_PASS` | SMTP credentials |
 | `SMTP_FROM` | From address permitted by your SMTP provider |
 | `SMTP_SECURE` | Set to `true` for implicit TLS. Port `465` also enables it automatically. |
+| `PASSWORD_RESET_ORIGIN` | Trusted HTTPS frontend origin used in reset links, with no path (for example, `https://agri-connect-five-pi.vercel.app`) |
+| `PASSWORD_RESET_SANDBOX_EMAIL` | Optional dedicated demo account at `@example.com` with only the `BUYER` role. While using Mailtrap Sandbox, only this account can receive and use a password reset link. |
 
 Render free web services block outbound SMTP ports 25, 465, and 587. Mailtrap Email Sandbox captures test messages in its inbox. In-app notifications work independently of SMTP. Background jobs for hold expiry, negotiation expiry, labour shortfalls, and email run while the API is awake and catch up when Render restarts. [Render free-tier limits](https://render.com/docs/free) · [Mailtrap Sandbox SMTP setup](https://docs.mailtrap.io/email-sandbox/setup/sandbox-smtp-integration)
+
+To deliver notification and password reset emails to users, use Mailtrap Live Sending SMTP (port `2525`) with a verified sending domain and update `SMTP_FROM` to use that domain. An Email Sandbox inbox is shared test infrastructure and cannot prove ownership of a real user's email address. Reset links for the dedicated demo account stay in the sandbox. [Mailtrap Live Sending setup](https://docs.mailtrap.io/getting-started/email-api-smtp)
 
 ## 2. Frontend
 

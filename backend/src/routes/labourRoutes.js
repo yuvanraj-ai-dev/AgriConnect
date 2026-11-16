@@ -38,11 +38,12 @@ router.get('/directory', farmer, route(async (req, res) => {
 
 router.get('/jobs', labourer, route(async (req, res) => {
   const category = textFilter(req.query.category);
-  res.json(await db.labourJob.findMany({
-    where: { ...openNow(), farmerId: { not: req.user.id }, category: category ? { contains: category, mode: 'insensitive' } : undefined,
+  const jobs = await db.labourJob.findMany({
+    where: { ...openNow(), category: category ? { contains: category, mode: 'insensitive' } : undefined,
       workers: { none: { workerId: req.user.id, status: { in: ['ACCEPTED', 'INVITED'] } } } },
     orderBy: { startDate: 'asc' }, take: 100,
-  }));
+  });
+  res.json(jobs.map((job) => ({ ...job, isOwnPosting: job.farmerId === req.user.id })));
 }));
 
 router.get('/my-jobs', farmer, route(async (req, res) => {

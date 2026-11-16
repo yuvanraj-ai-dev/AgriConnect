@@ -1,6 +1,7 @@
 import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Login from './pages/Login';
+import { ForgotPassword, ResetPassword } from './pages/PasswordReset';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import FarmerSoilTest from './pages/FarmerSoilTest';
@@ -120,6 +121,8 @@ function App() {
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Home />} />
           <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
           <Route path="/dashboard" element={protectedPage(user && <Dashboard user={user} />)} />
           <Route path="/notifications" element={protectedPage(<Notifications />)} />

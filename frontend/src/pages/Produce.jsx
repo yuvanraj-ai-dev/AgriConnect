@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { dateLabel, ErrorMessage, Field, formValues, ModulePage, Panel, PhotoUpload, QueryState, rupees, Status, timeLabel, useAction, useQuery } from '../moduleUi';
 
@@ -167,8 +168,10 @@ export default function Produce({ view }) {
     <QueryState query={listings} empty={!listings.data.length && (farmer ? 'You have no listed batches.' : 'No available batches match this search.')} />
     <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
       {listings.data.map((listing) => <Batch key={listing.id} listing={listing}>
-        {farmer ? <Status value={listing.active ? 'PUBLISHED' : Number(listing.quantity) ? 'BELOW_MINIMUM_BATCH' : 'SOLD_OUT'} /> : <BuyForm listing={listing} busy={action.busy}
-          buy={(body, done) => request(listing, 'buy', body, done)} offer={(body) => request(listing, 'offers', body)} />}
+        {farmer ? <Status value={listing.active ? 'PUBLISHED' : Number(listing.quantity) ? 'BELOW_MINIMUM_BATCH' : 'SOLD_OUT'} /> :
+          listing.isOwnPosting ? <p>Your listing · <Link to="/produce" className="underline">View your batches</Link></p> :
+            <BuyForm listing={listing} busy={action.busy}
+              buy={(body, done) => request(listing, 'buy', body, done)} offer={(body) => request(listing, 'offers', body)} />}
       </Batch>)}
     </div>
     <Conversations view={view} negotiations={negotiations} agreements={agreements} action={action} update={refresh} />

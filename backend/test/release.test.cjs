@@ -4,6 +4,7 @@ const { createHmac, randomUUID } = require('node:crypto');
 const { mkdtemp, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
+const { EventEmitter, once } = require('node:events');
 
 if (!process.env.TEST_DATABASE_URL) throw new Error('Set TEST_DATABASE_URL to a disposable PostgreSQL database with the release schema.');
 const database = new URL(process.env.TEST_DATABASE_URL);
@@ -26,6 +27,7 @@ const { DAY, indiaDay } = require('../src/http');
 const { expireOrders } = require('../src/marketplace');
 const { notifyShortfalls } = require('../src/routes/labourRoutes');
 const { expireNegotiations } = require('../src/routes/produceRoutes');
+const mailer = require('../src/mailer');
 
 const runId = randomUUID();
 const originalFetch = globalThis.fetch;
@@ -115,6 +117,48 @@ test('release workflows on PostgreSQL', async (suite) => {
     const next = await post('/auth/login', null, { email: account.email, password: account.password }, 200);
     await db.session.updateMany({ where: { userId: account.id }, data: { lastActiveAt: new Date(Date.now() - 61 * 60000) } });
     assert.equal((await get('/auth/me', next.token, 401)).code, 'SESSION_EXPIRED');
+  });
+
+  await suite.test('password reset emails are scoped to the sandbox demo and links are single use', async (context) => {
+    const demo = { email: 'reset-' + runId + '@example.com', password: 'original-test-password' };
+    const environment = {
+      SMTP_HOST: 'sandbox.smtp.mailtrap.io', SMTP_FROM: 'agriconnect@example.com',
+      PASSWORD_RESET_ORIGIN: 'https://agriconnect.example.com', PASSWORD_RESET_SANDBOX_EMAIL: demo.email,
+    };
+    const prior = Object.fromEntries(Object.keys(environment).map((key) => [key, process.env[key]]));
+    Object.assign(process.env, environment);
+    context.after(() => {
+      for (const [key, value] of Object.entries(prior)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+    const outbox = new EventEmitter();
+    const delivery = context.mock.method(mailer, 'sendMail', async (message) => outbox.emit('mail', message));
+    const { userId } = await post('/auth/register', null, { ...demo, roles: ['BUYER'] });
+    const session = await post('/auth/login', null, demo, 200);
+    assert.equal((await get('/platform/notifications', session.token)).emailMode, 'sandbox');
+
+    const sent = once(outbox, 'mail', { signal: AbortSignal.timeout(5000) });
+    const requested = await post('/auth/forgot-password', null, { email: demo.email }, 202);
+    assert.deepEqual(await post('/auth/forgot-password', null, { email: 'missing@example.com' }, 202), requested);
+    assert.deepEqual(await post('/auth/forgot-password', null, { email: users.get('admin').email }, 202), requested);
+    const [message] = await sent;
+    assert.equal(message.to, demo.email);
+    const link = new URL(message.text.match(/^https:\/\/[^\s]+/m)[0]);
+    assert.equal(link.origin, environment.PASSWORD_RESET_ORIGIN);
+    const token = new URLSearchParams(link.hash.slice(1)).get('token');
+    const saved = await db.passwordReset.findUnique({ where: { userId } });
+    assert.notEqual(saved.tokenHash, token);
+    for (let i = 0; i < 2; i++) await post('/auth/forgot-password', null, { email: demo.email }, 202);
+
+    const password = 'replacement-test-password';
+    const resets = await Promise.all([0, 1].map(() => post('/auth/reset-password', null, { token, password }, null)));
+    assert.deepEqual(resets.map(({ status }) => status).sort(), [204, 400]);
+    await get('/auth/me', session.token, 401);
+    await post('/auth/login', null, demo, 401);
+    assert.ok((await post('/auth/login', null, { email: demo.email, password }, 200)).token);
+    assert.equal(delivery.mock.callCount(), 1);
   });
 
   await suite.test('soil capacity, ownership, cancellation and private PDF delivery', async () => {
@@ -253,6 +297,24 @@ test('release workflows on PostgreSQL', async (suite) => {
     const mine = (await get('/equipment/reservations/mine', 'farmer')).find((item) => item.id === result.id);
     assert.equal(mine.machine.owner.email, users.get('vendor').email);
     await post('/equipment/machines/' + instant.id + '/blocks', 'vendor', { startDate: date(1), endDate: date(2) }, 409);
+  });
+
+  await suite.test('accounts with multiple roles can see their published jobs and produce without self-dealing', async () => {
+    await person('publisher', ['FARMER', 'LABOURER', 'BUYER']);
+    const job = await post('/labour/jobs', 'publisher', {
+      category: 'Irrigation', location: 'Warangal', workerCount: '2', dailyWage: '500', startDate: date(2), endDate: date(3),
+    });
+    const posting = (items) => items.find(({ id }) => id === job.id);
+    assert.equal(posting(await get('/labour/jobs', 'publisher')).isOwnPosting, true);
+    assert.equal(posting(await get('/labour/jobs', 'worker')).isOwnPosting, false);
+    await post('/labour/jobs/' + job.id + '/accept', 'publisher', null, 400);
+
+    const batch = await post('/produce/listings', 'publisher', { crop: 'Rice', grade: 'A', location: 'Warangal',
+      quantity: '6', minBatch: '1', basePrice: '2500', allowNegotiation: true });
+    const listing = (items) => items.find(({ id }) => id === batch.id);
+    assert.equal(listing(await get('/produce/listings', 'publisher')).isOwnPosting, true);
+    assert.equal(listing(await get('/produce/listings', 'buyer')).isOwnPosting, false);
+    await post('/produce/listings/' + batch.id + '/buy', 'publisher', { quantity: '1', pricePaise: 250000, requestKey: randomUUID() }, 404);
   });
 
   await suite.test('produce negotiation, immutable events, expiry and concurrent stock', async () => {

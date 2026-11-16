@@ -12,6 +12,7 @@ export default function Notifications() {
     <ModulePage title="Notifications" links={query.data.unread > 0 &&
       <button className="module-button secondary" disabled={action.busy} onClick={() => mark('/platform/notifications/read')}>Mark all as read</button>}>
       <ErrorMessage>{action.error}</ErrorMessage>
+      {query.data.emailMode === 'sandbox' && <p role="status">Email notifications are captured in the Mailtrap test inbox.</p>}
       <QueryState query={query} empty={!query.data.items.length && 'You have no notifications.'} />
       {query.data.items.map((item) =>
         <Panel key={item.id}>

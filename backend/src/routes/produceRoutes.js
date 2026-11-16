@@ -73,13 +73,14 @@ async function expireNegotiations() {
 router.use(authenticateToken);
 router.get('/listings', buyer, route(async (req, res) => {
   const search = textFilter(req.query.search);
-  res.json(await db.produceListing.findMany({
+  const listings = await db.produceListing.findMany({
     where: {
-      ...activeFarmer, active: true, farmerId: { not: req.user.id }, quantity: { gt: 0 },
+      ...activeFarmer, active: true, quantity: { gt: 0 },
       OR: search ? ['crop', 'grade', 'location'].map((field) => ({ [field]: { contains: search, mode: 'insensitive' } })) : undefined,
     },
     orderBy: { createdAt: 'desc' }, take: 100,
-  }));
+  });
+  res.json(listings.map((listing) => ({ ...listing, isOwnPosting: listing.farmerId === req.user.id })));
 }));
 
 router.get('/mine', farmer, route(async (req, res) => {

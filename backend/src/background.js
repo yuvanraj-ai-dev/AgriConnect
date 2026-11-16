@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer');
+const mailer = require('./mailer');
 const { db } = require('./db');
 const { SESSION_LENGTH } = require('./access');
 const { expireOrders } = require('./marketplace');
@@ -6,14 +6,7 @@ const { notifyShortfalls } = require('./routes/labourRoutes');
 const { expireNegotiations } = require('./routes/produceRoutes');
 
 function emailWorker() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SECURE } = process.env;
-  if (!SMTP_HOST || !SMTP_FROM) return null;
-  const port = Number(SMTP_PORT || 587);
-  const transporter = nodemailer.createTransport({
-    host: SMTP_HOST, port, secure: SMTP_SECURE === 'true' || port === 465,
-    auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
-    connectionTimeout: 8000, greetingTimeout: 8000, socketTimeout: 10000,
-  });
+  if (mailer.emailMode() === 'off') return null;
   return async () => {
     const now = new Date();
     const due = { emailedAt: null, emailAttempts: { lt: 5 },
@@ -28,13 +21,13 @@ function emailWorker() {
       if (!claimed.count) continue;
       try {
         const user = await db.user.findFirst({ where: { id: item.userId, active: true, deletedAt: null }, select: { email: true } });
-        if (user) await transporter.sendMail({
-          from: SMTP_FROM, to: user.email, subject: 'AgriConnect notification',
+        if (user) await mailer.sendMail({
+          to: user.email, subject: 'AgriConnect notification',
           text: item.message, messageId: '<agriconnect-' + item.id + '@notifications.agriconnect>',
         });
         await db.notification.update({ where: { id: item.id }, data: { emailedAt: new Date() } });
       } catch (error) {
-        console.warn('Notification email failed', item.id, error.code || error.name);
+        console.warn('Notification email failed', item.id, mailer.emailError(error));
       }
     }
   };
@@ -64,6 +57,7 @@ function startBackgroundJobs() {
   schedule('sessions', () => db.session.deleteMany({ where: {
     lastActiveAt: { lte: new Date(Date.now() - SESSION_LENGTH) },
   } }), 60_000);
+  schedule('expired password reset links', () => db.passwordReset.deleteMany({ where: { expiresAt: { lte: new Date() } } }), 60_000);
   const email = emailWorker();
   if (email) schedule('email', email, 30_000);
 }

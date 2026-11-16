@@ -24,6 +24,7 @@ export default function Login() {
     <div className="max-w-md mx-auto mt-10 bg-white p-8 border border-agriBorder rounded shadow-sm">
       <h2 className="text-2xl font-bold mb-6 text-center text-agriGreen">Login to AgriConnect</h2>
       {params.has('expired') && <p role="status" className="mb-4 rounded bg-amber-50 p-3 text-amber-950">Session Expired. Sign in to continue.</p>}
+      {params.has('reset') && <p role="status" className="mb-4 rounded bg-green-50 p-3 text-green-950">Password updated. Sign in with your new password.</p>}
       {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
@@ -46,6 +47,7 @@ export default function Login() {
             required
           />
         </div>
+        <Link to="/forgot-password" className="mb-4 block text-agriGreen underline">Forgot password?</Link>
         <button type="submit" className="w-full bg-agriGreen text-white p-3 rounded font-bold hover:bg-agriLightGreen">
           Login
         </button>

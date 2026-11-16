@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import { dateLabel, ErrorMessage, Field, formValues, ModulePage, Panel, QueryState, rupees, Status, toDay, today, useAction, useQuery } from '../moduleUi';
 
@@ -166,7 +167,8 @@ export function LabourerJobs() {
         <QueryState query={jobs} empty={!jobs.data.length && 'No open jobs match this search.'} />
         {jobs.data.map((job) => <Panel key={job.id}>
           <JobDetails job={job} />
-          <button className="module-button" disabled={action.busy} onClick={() => respond(job, 'accept')}>Accept job</button>
+          {job.isOwnPosting ? <p>Your posting · <Link to="/labour" className="underline">Manage job</Link></p> :
+            <button className="module-button" disabled={action.busy} onClick={() => respond(job, 'accept')}>Accept job</button>}
         </Panel>)}
       </div>
       <div className="space-y-4">

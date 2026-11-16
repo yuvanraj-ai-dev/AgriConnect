@@ -21,10 +21,21 @@ model User {
   machinery        Machinery[]
   deletedAt        DateTime?
   sessions         Session[]
+  passwordReset    PasswordReset?
   labourProfile    LabourProfile?
   cart             CartItem[]
   jobs             LabourJob[]
   produceListings  ProduceListing[]
+}
+
+model PasswordReset {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  issuedAt  DateTime
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }
 
 model Session {

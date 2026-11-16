@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { db } = require('../db');
+const { db, serializable } = require('../db');
 const { check } = require('../http');
 const { PUBLIC_ROLES, credentials, effectiveRoles } = require('../access');
 
@@ -22,7 +22,11 @@ async function login(req, res) {
   const user = await db.user.findUnique({ where: { email: email.trim() } });
   check(user?.active && !user.deletedAt && await bcrypt.compare(password, user.passwordHash),
     401, 'Invalid credentials or inactive account.');
-  const session = await db.session.create({ data: { userId: user.id } });
+  const session = await serializable(async (tx) => {
+    const unchanged = await tx.user.findFirst({ where: { id: user.id, active: true, deletedAt: null, passwordHash: user.passwordHash }, select: { id: true } });
+    check(unchanged, 401, 'Invalid credentials or inactive account.');
+    return tx.session.create({ data: { userId: user.id } });
+  });
   const token = jwt.sign({ sid: session.id }, process.env.JWT_SECRET, { subject: user.id, algorithm: 'HS256' });
   res.json({
     token,
