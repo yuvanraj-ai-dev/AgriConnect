@@ -1,413 +1,165 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const { db, serializable } = require('../db');
+const { check, requiredText, textFilter, whole, money } = require('../http');
+const { categoryCode, categoryAliases, displayCategory } = require('../productCategories');
+const operationalStatuses = ['AVAILABLE', 'RENTED', 'UNDER_MAINTENANCE'];
+const optional = (value, field, max) => value ? requiredText(value, field, max) : null;
 
-// ==========================================
-// FERTILIZERS & AGRICULTURAL INPUTS (PRODUCTS)
-// ==========================================
+function imageUrl(value) {
+  const url = optional(value, 'Photo URL', 2048);
+  check(!url || /^https?:\/\//i.test(url), 400, 'Enter a valid photo URL.');
+  return url;
+}
 
-// Create a new product listing (e.g. Fertilizers, Seeds, Pesticides, etc.)
+function choice(value, options, label) {
+  check(options.includes(value), 400, 'Choose a valid ' + label + '.');
+  return value;
+}
+
+function boolean(value, label) {
+  check(typeof value === 'boolean', 400, label + ' must be true or false.');
+  return value;
+}
+
+function productCategory(value) {
+  check(categoryCode(value), 400, 'Choose a valid category.');
+  return displayCategory(value);
+}
+
+const productFields = {
+  title: (v) => requiredText(v, 'Title'),
+  category: productCategory,
+  brand: (v) => optional(v, 'Brand', 150),
+  description: (v) => optional(v, 'Description', 2000),
+  price: (v) => money(v, 'Price', 0) / 100,
+  unit: (v) => requiredText(v, 'Packaging unit', 100),
+  stockQuantity: (v) => whole(v === '' ? 0 : v, 'Stock', 0, 100000000),
+  safetyWarning: (v) => optional(v, 'Safety warning', 2000),
+  imageUrl,
+  active: (v) => boolean(v, 'Active'),
+};
+const machineFields = {
+  name: (v) => requiredText(v, 'Equipment name'),
+  type: (v) => requiredText(v, 'Equipment type'),
+  dailyRate: (v) => money(v, 'Daily rate') / 100,
+  securityDeposit: (v) => money(v || 0, 'Security deposit', 0) / 100,
+  depositTerms: (v) => optional(v, 'Security deposit terms', 1500),
+  location: (v) => requiredText(v, 'Location', 500),
+  operationalStatus: (v) => choice(v, operationalStatuses, 'operational status'),
+  instantApproval: (v) => boolean(v, 'Instant approval'),
+  specifications: (v) => optional(v, 'Specifications', 2000),
+  imageUrl,
+  active: (v) => boolean(v, 'Active'),
+};
+
+function fields(input, validators) {
+  return Object.fromEntries(Object.entries(validators)
+    .filter(([key]) => input[key] !== undefined).map(([key, validate]) => [key, validate(input[key])]));
+}
+
+function verifyWarning(product) {
+  if (categoryCode(product.category) === 'PESTICIDE') requiredText(product.safetyWarning, 'Pesticide safety warning', 2000);
+}
+
 exports.createProduct = async (req, res) => {
-  try {
-    const {
-      title,
-      category,
-      brand,
-      description,
-      price,
-      unit,
-      stockQuantity,
-      safetyWarning,
-      imageUrl
-    } = req.body;
-
-    if (!title || !category || price === undefined || price === '' || !unit) {
-      return res.status(400).json({ error: 'Title, category, price, and packaging unit are required.' });
-    }
-
-    const numericPrice = parseFloat(price);
-    const numericStock = parseInt(stockQuantity !== undefined && stockQuantity !== '' ? stockQuantity : 0, 10);
-
-    if (isNaN(numericPrice) || numericPrice < 0) {
-      return res.status(400).json({ error: 'Price must be a valid positive number.' });
-    }
-
-    if (isNaN(numericStock) || numericStock < 0) {
-      return res.status(400).json({ error: 'Stock quantity cannot be negative.' });
-    }
-
-    // Verify vendor user exists in database
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User session invalid. Please log out and log in again.' });
-    }
-
-    const product = await prisma.product.create({
-      data: {
-        vendorId: req.user.id,
-        title: title.trim(),
-        category: category.trim(),
-        brand: brand ? brand.trim() : null,
-        description: description ? description.trim() : null,
-        price: numericPrice,
-        unit: unit.trim(),
-        stockQuantity: numericStock,
-        safetyWarning: safetyWarning ? safetyWarning.trim() : null,
-        imageUrl: imageUrl ? imageUrl.trim() : null,
-        active: true
-      }
-    });
-
-    res.status(201).json(product);
-  } catch (error) {
-    console.error('Error creating product:', error);
-    res.status(500).json({ error: 'Failed to create product listing', detail: error.message });
-  }
+  const { title, category, price, unit } = req.body;
+  const data = fields({
+    stockQuantity: 0, ...req.body, title: title ?? '', category: category ?? '', price: price ?? '', unit: unit ?? '',
+  }, productFields);
+  verifyWarning(data);
+  res.status(201).json(await db.product.create({ data: { ...data, vendorId: req.user.id } }));
 };
 
-// Get products (either vendor's own listings or all active listings if all=true)
-exports.getProducts = async (req, res) => {
-  try {
-    const { all, category, search } = req.query;
-
-    const where = {};
-
-    // If 'all' is requested, show all active products for the marketplace
-    // Otherwise, show only the authenticated vendor's products
-    if (all === 'true') {
-      where.active = true;
-    } else {
-      where.vendorId = req.user.id;
-    }
-
-    if (category && category !== 'ALL') {
-      where.category = category;
-    }
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { brand: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-
-    const products = await prisma.product.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        vendor: {
-          select: { id: true, email: true }
-        }
-      }
-    });
-
-    res.status(200).json(products);
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ error: 'Failed to fetch products', detail: error.message });
-  }
-};
-
-// Update an existing product listing
-exports.updateProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      title,
-      category,
-      brand,
-      description,
-      price,
-      unit,
-      stockQuantity,
-      safetyWarning,
-      imageUrl,
-      active
-    } = req.body;
-
-    const existing = await prisma.product.findUnique({ where: { id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Product not found.' });
-    }
-
-    // Role check: vendor must own product or be ADMIN
-    if (existing.vendorId !== req.user.id && !req.user.roles.includes('ADMIN')) {
-      return res.status(403).json({ error: 'You are not authorized to update this product.' });
-    }
-
-    const updateData = {};
-    if (title !== undefined) updateData.title = title.trim();
-    if (category !== undefined) updateData.category = category.trim();
-    if (brand !== undefined) updateData.brand = brand ? brand.trim() : null;
-    if (description !== undefined) updateData.description = description ? description.trim() : null;
-    if (price !== undefined) {
-      const p = parseFloat(price);
-      if (isNaN(p) || p < 0) return res.status(400).json({ error: 'Invalid price.' });
-      updateData.price = p;
-    }
-    if (unit !== undefined) updateData.unit = unit.trim();
-    if (stockQuantity !== undefined) {
-      const s = parseInt(stockQuantity, 10);
-      if (isNaN(s) || s < 0) return res.status(400).json({ error: 'Invalid stock quantity.' });
-      updateData.stockQuantity = s;
-    }
-    if (safetyWarning !== undefined) updateData.safetyWarning = safetyWarning ? safetyWarning.trim() : null;
-    if (imageUrl !== undefined) updateData.imageUrl = imageUrl ? imageUrl.trim() : null;
-    if (active !== undefined) updateData.active = Boolean(active);
-
-    const updated = await prisma.product.update({
-      where: { id },
-      data: updateData
-    });
-
-    res.status(200).json(updated);
-  } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ error: 'Failed to update product', detail: error.message });
-  }
-};
-
-// Delete a product listing
-exports.deleteProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const existing = await prisma.product.findUnique({ where: { id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Product not found.' });
-    }
-
-    if (existing.vendorId !== req.user.id && !req.user.roles.includes('ADMIN')) {
-      return res.status(403).json({ error: 'You are not authorized to delete this product.' });
-    }
-
-    await prisma.product.delete({ where: { id } });
-
-    res.status(200).json({ message: 'Product deleted successfully.' });
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    res.status(500).json({ error: 'Failed to delete product', detail: error.message });
-  }
-};
-
-// ==========================================
-// RENTAL MACHINERY & EQUIPMENT
-// ==========================================
-
-// Create a new rental machinery listing
 exports.createMachinery = async (req, res) => {
-  try {
-    const {
-      name,
-      type,
-      dailyRate,
-      securityDeposit,
-      location,
-      operationalStatus,
-      instantApproval,
-      specifications,
-      imageUrl
-    } = req.body;
-
-    if (!name || !type || dailyRate === undefined || dailyRate === '' || !location) {
-      return res.status(400).json({ error: 'Name, machinery type, daily rate, and location are required.' });
-    }
-
-    const numericDailyRate = parseFloat(dailyRate);
-    const numericDeposit = parseFloat(securityDeposit !== undefined && securityDeposit !== '' ? securityDeposit : 0);
-
-    if (isNaN(numericDailyRate) || numericDailyRate <= 0) {
-      return res.status(400).json({ error: 'Daily rate must be a valid positive amount.' });
-    }
-
-    if (isNaN(numericDeposit) || numericDeposit < 0) {
-      return res.status(400).json({ error: 'Security deposit cannot be negative.' });
-    }
-
-    // Verify owner user exists in database
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id }
-    });
-
-    if (!user) {
-      return res.status(401).json({ error: 'User session invalid. Please log out and log in again.' });
-    }
-
-    const machinery = await prisma.machinery.create({
-      data: {
-        ownerId: req.user.id,
-        name: name.trim(),
-        type: type.trim(),
-        dailyRate: numericDailyRate,
-        securityDeposit: numericDeposit,
-        location: location.trim(),
-        operationalStatus: operationalStatus ? operationalStatus.trim() : 'AVAILABLE',
-        instantApproval: Boolean(instantApproval),
-        specifications: specifications ? specifications.trim() : null,
-        imageUrl: imageUrl ? imageUrl.trim() : null,
-        active: true
-      }
-    });
-
-    res.status(201).json(machinery);
-  } catch (error) {
-    console.error('Error creating machinery:', error);
-    res.status(500).json({ error: 'Failed to create machinery listing', detail: error.message });
-  }
+  const { name, type, dailyRate, location } = req.body;
+  const data = fields({
+    ...req.body, name: name ?? '', type: type ?? '', dailyRate: dailyRate ?? '', location: location ?? '',
+  }, machineFields);
+  res.status(201).json(await db.machinery.create({ data: { ...data, ownerId: req.user.id } }));
 };
 
-// Get rental machinery (vendor's own listings or all active listings if all=true)
+exports.getProducts = async (req, res) => {
+  const search = textFilter(req.query.search);
+  const category = textFilter(req.query.category);
+  const all = req.query.all === 'true';
+  const products = await db.product.findMany({
+    where: {
+      deletedAt: null, vendorId: all ? undefined : req.user.id, active: all ? true : undefined,
+      category: category && category !== 'ALL' ? { in: categoryAliases(category), mode: 'insensitive' } : undefined,
+      OR: search ? ['title', 'brand', 'description'].map((key) => ({ [key]: { contains: search, mode: 'insensitive' } })) : undefined,
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { vendor: { select: { id: true, email: true } } },
+  });
+  res.json(products.map((product) => ({ ...product, category: displayCategory(product.category) })));
+};
+
 exports.getMachinery = async (req, res) => {
-  try {
-    const { all, type, status, search } = req.query;
-
-    const where = {};
-
-    if (all === 'true') {
-      where.active = true;
-    } else {
-      where.ownerId = req.user.id;
-    }
-
-    if (type && type !== 'ALL') {
-      where.type = type;
-    }
-
-    if (status && status !== 'ALL') {
-      where.operationalStatus = status;
-    }
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { location: { contains: search, mode: 'insensitive' } },
-        { specifications: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-
-    const machinery = await prisma.machinery.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        owner: {
-          select: { id: true, email: true }
-        }
-      }
-    });
-
-    res.status(200).json(machinery);
-  } catch (error) {
-    console.error('Error fetching machinery:', error);
-    res.status(500).json({ error: 'Failed to fetch machinery', detail: error.message });
-  }
+  const search = textFilter(req.query.search);
+  const type = textFilter(req.query.type);
+  const status = textFilter(req.query.status);
+  const all = req.query.all === 'true';
+  res.json(await db.machinery.findMany({
+    where: {
+      deletedAt: null, ownerId: all ? undefined : req.user.id, active: all ? true : undefined,
+      type: type && type !== 'ALL' ? type : undefined, operationalStatus: status && status !== 'ALL' ? status : undefined,
+      OR: search ? ['name', 'location', 'specifications'].map((key) => ({ [key]: { contains: search, mode: 'insensitive' } })) : undefined,
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { owner: { select: { id: true, email: true } } },
+  }));
 };
 
-// Update an existing rental machinery listing
+async function owned(tx, req, model, ownerField) {
+  const record = await tx[model].findFirst({ where: { id: req.params.id, deletedAt: null } });
+  check(record, 404, 'Listing not found.');
+  check(record[ownerField] === req.user.id || req.user.roles.includes('ADMIN'), 403, 'You do not manage this listing.');
+  return record;
+}
+
+exports.updateProduct = async (req, res) => {
+  const data = fields(req.body, productFields);
+  const product = await serializable(async (tx) => {
+    const existing = await owned(tx, req, 'product', 'vendorId');
+    if (req.body.expectedUpdatedAt) {
+      check(existing.updatedAt.toISOString() === req.body.expectedUpdatedAt, 409, 'This listing changed. Reopen it to edit the latest stock and details.');
+    }
+    verifyWarning({ ...existing, ...data });
+    return tx.product.update({ where: { id: existing.id }, data });
+  });
+  res.json(product);
+};
+
 exports.updateMachinery = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      name,
-      type,
-      dailyRate,
-      securityDeposit,
-      location,
-      operationalStatus,
-      instantApproval,
-      specifications,
-      imageUrl,
-      active
-    } = req.body;
+  const data = fields(req.body, machineFields);
+  const machine = await serializable(async (tx) => {
+    const existing = await owned(tx, req, 'machinery', 'ownerId');
+    return tx.machinery.update({ where: { id: existing.id }, data });
+  });
+  res.json(machine);
+};
 
-    const existing = await prisma.machinery.findUnique({ where: { id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Machinery not found.' });
-    }
-
-    if (existing.ownerId !== req.user.id && !req.user.roles.includes('ADMIN')) {
-      return res.status(403).json({ error: 'You are not authorized to update this machinery.' });
-    }
-
-    const updateData = {};
-    if (name !== undefined) updateData.name = name.trim();
-    if (type !== undefined) updateData.type = type.trim();
-    if (dailyRate !== undefined) {
-      const dr = parseFloat(dailyRate);
-      if (isNaN(dr) || dr <= 0) return res.status(400).json({ error: 'Invalid daily rate.' });
-      updateData.dailyRate = dr;
-    }
-    if (securityDeposit !== undefined) {
-      const sd = parseFloat(securityDeposit);
-      if (isNaN(sd) || sd < 0) return res.status(400).json({ error: 'Invalid security deposit.' });
-      updateData.securityDeposit = sd;
-    }
-    if (location !== undefined) updateData.location = location.trim();
-    if (operationalStatus !== undefined) updateData.operationalStatus = operationalStatus.trim();
-    if (instantApproval !== undefined) updateData.instantApproval = Boolean(instantApproval);
-    if (specifications !== undefined) updateData.specifications = specifications ? specifications.trim() : null;
-    if (imageUrl !== undefined) updateData.imageUrl = imageUrl ? imageUrl.trim() : null;
-    if (active !== undefined) updateData.active = Boolean(active);
-
-    const updated = await prisma.machinery.update({
-      where: { id },
-      data: updateData
+function archive(model, ownerField) {
+  return async (req, res) => {
+    await serializable(async (tx) => {
+      const existing = await owned(tx, req, model, ownerField);
+      await tx[model].update({ where: { id: existing.id }, data: { active: false, deletedAt: new Date() } });
     });
+    res.json({ message: 'Listing removed.' });
+  };
+}
 
-    res.status(200).json(updated);
-  } catch (error) {
-    console.error('Error updating machinery:', error);
-    res.status(500).json({ error: 'Failed to update machinery', detail: error.message });
-  }
-};
+exports.deleteProduct = archive('product', 'vendorId');
+exports.deleteMachinery = archive('machinery', 'ownerId');
 
-// Delete a rental machinery listing
-exports.deleteMachinery = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const existing = await prisma.machinery.findUnique({ where: { id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Machinery not found.' });
-    }
-
-    if (existing.ownerId !== req.user.id && !req.user.roles.includes('ADMIN')) {
-      return res.status(403).json({ error: 'You are not authorized to delete this machinery.' });
-    }
-
-    await prisma.machinery.delete({ where: { id } });
-
-    res.status(200).json({ message: 'Machinery listing deleted successfully.' });
-  } catch (error) {
-    console.error('Error deleting machinery:', error);
-    res.status(500).json({ error: 'Failed to delete machinery', detail: error.message });
-  }
-};
-
-// ==========================================
-// VENDOR SHOP SUMMARY / STATS
-// ==========================================
 exports.getVendorStats = async (req, res) => {
-  try {
-    const vendorId = req.user.id;
-
-    const [totalProducts, outOfStockProducts, totalMachinery, availableMachinery] = await Promise.all([
-      prisma.product.count({ where: { vendorId } }),
-      prisma.product.count({ where: { vendorId, stockQuantity: { lte: 0 } } }),
-      prisma.machinery.count({ where: { ownerId: vendorId } }),
-      prisma.machinery.count({ where: { ownerId: vendorId, operationalStatus: 'AVAILABLE' } })
-    ]);
-
-    res.status(200).json({
-      totalProducts,
-      outOfStockProducts,
-      totalMachinery,
-      availableMachinery
-    });
-  } catch (error) {
-    console.error('Error fetching vendor stats:', error);
-    res.status(500).json({ error: 'Failed to fetch vendor statistics', detail: error.message });
-  }
+  const id = req.user.id;
+  const product = { vendorId: id, deletedAt: null };
+  const machine = { ownerId: id, deletedAt: null };
+  const [totalProducts, outOfStockProducts, totalMachinery, availableMachinery] = await Promise.all([
+    db.product.count({ where: product }),
+    db.product.count({ where: { ...product, stockQuantity: { lte: 0 } } }),
+    db.machinery.count({ where: machine }),
+    db.machinery.count({ where: { ...machine, active: true, operationalStatus: 'AVAILABLE' } }),
+  ]);
+  res.json({ totalProducts, outOfStockProducts, totalMachinery, availableMachinery });
 };

@@ -6,15 +6,21 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "build": "prisma generate && prisma db push --accept-data-loss"
+    "build": "prisma generate && npm run db:sync",
+    "db:sync": "prisma db push --skip-generate && prisma db execute --schema prisma/schema.prisma --file prisma/constraints.sql",
+    "test": "node --test",
+    "admin:grant": "node src/bootstrapAdmin.js"
   },
   "dependencies": {
     "@prisma/client": "^5.0.0",
-    "bcrypt": "^5.1.0",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.1",
+    "multer": "^2.5.0",
+    "nodemailer": "^7.0.13",
     "prisma": "^5.0.0"
   },
   "devDependencies": {

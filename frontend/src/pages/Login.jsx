@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
 export default function Login() {
+  const [params] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,6 +23,7 @@ export default function Login() {
   return (
     <div className="max-w-md mx-auto mt-10 bg-white p-8 border border-agriBorder rounded shadow-sm">
       <h2 className="text-2xl font-bold mb-6 text-center text-agriGreen">Login to AgriConnect</h2>
+      {params.has('expired') && <p role="status" className="mb-4 rounded bg-amber-50 p-3 text-amber-950">Session Expired. Sign in to continue.</p>}
       {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="mb-4">

@@ -60,6 +60,7 @@ export default function Register() {
           <label className="block text-sm font-medium mb-1">Password</label>
           <input 
             type="password" 
+            minLength={8}
             className="w-full p-2 border border-agriBorder rounded focus:outline-none focus:border-agriGreen"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

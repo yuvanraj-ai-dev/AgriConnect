@@ -1,51 +1,48 @@
 const jwt = require('jsonwebtoken');
+const { db } = require('../db');
+const { SESSION_LENGTH, effectiveRoles, userSelect } = require('../access');
+const { route, check } = require('../http');
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: 'No token provided' });
+const authenticateToken = route(async (req, res, next) => {
+  const token = /^Bearer (.+)$/i.exec(req.get('Authorization') || '')?.[1];
+  check(token, 401, 'Sign in to continue.');
+  let claims;
+  try {
+    claims = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
+  } catch {
+    return res.status(401).json({ code: 'SESSION_EXPIRED', message: 'Session Expired' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: 'Token invalid or expired' });
-    }
-    req.user = user;
-    next();
+  const expired = () => res.status(401).json({ code: 'SESSION_EXPIRED', message: 'Session Expired' });
+  if (typeof claims.sid !== 'string' || typeof claims.sub !== 'string') return expired();
+
+  const now = new Date();
+  const session = await db.session.updateMany({
+    where: {
+      id: claims.sid, userId: claims.sub,
+      lastActiveAt: { gt: new Date(now.getTime() - SESSION_LENGTH) },
+      user: { active: true, deletedAt: null },
+    },
+    data: { lastActiveAt: now },
   });
-};
+  if (!session.count) return expired();
+  const user = await db.user.findUnique({ where: { id: claims.sub }, select: userSelect });
+  if (!user?.active) return expired();
 
-const requireRole = (roles) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-    
-    // Normalize user roles (handles array, stringified array, or single string)
-    let userRoles = req.user.roles || [];
-    if (typeof userRoles === 'string') {
-      try {
-        const parsed = JSON.parse(userRoles);
-        userRoles = Array.isArray(parsed) ? parsed : [userRoles];
-      } catch (e) {
-        userRoles = [userRoles];
-      }
-    } else if (!Array.isArray(userRoles)) {
-      userRoles = [userRoles];
-    }
-    req.user.roles = userRoles;
+  req.user = { ...user, assignedRoles: user.roles, roles: await effectiveRoles(user.roles) };
+  req.sessionId = claims.sid;
+  next();
+});
 
-    // Check if user has any of the required roles
-    const hasRole = userRoles.some((role) => roles.includes(role));
-    if (!hasRole) {
-      console.warn(`[RBAC] User ${req.user.id} denied access. Required: ${roles.join(',')}, Has: ${userRoles.join(',')}`);
-      return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
-    }
-    
-    next();
-  };
-};
+const requireRole = (roles) => route(async (req, res, next) => {
+  check(req.user, 401, 'Sign in to continue.');
+  if (!roles.some((role) => req.user.roles.includes(role))) {
+    console.warn('[RBAC]', req.user.id, 'denied', req.method, req.path);
+    await db.auditLog.create({ data: { userId: req.user.id, event: 'ACCESS_DENIED ' + req.method + ' ' + req.path.slice(0, 200) } })
+      .catch((error) => console.error('Audit write failed', error.code));
+    return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
+  }
+  next();
+});
 
 module.exports = { authenticateToken, requireRole };

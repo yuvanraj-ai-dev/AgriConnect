@@ -2,36 +2,26 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  timeout: 75000,
 });
 
-// Add a request interceptor to attach JWT token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = 'Bearer ' + token;
+  return config;
+});
 
-// Add a response interceptor to handle 401/403
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      // Clear token and optionally redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
-    return Promise.reject(error);
+api.interceptors.response.use((response) => {
+  if (response.config.headers.Authorization) window.dispatchEvent(new Event('agri-session-active'));
+  return response;
+}, (error) => {
+  if (error.response?.data?.code === 'SESSION_EXPIRED' &&
+      error.config?.headers.Authorization === 'Bearer ' + localStorage.getItem('token')) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.replace('/login?expired=1');
   }
-);
+  return Promise.reject(error);
+});
 
 export default api;

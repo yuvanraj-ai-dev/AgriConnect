@@ -1,99 +1,54 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Field, useQuery } from '../moduleUi';
 
-const MODULES = {
+const modules = {
   FARMER: [
-    { id: 'ST', title: 'Soil Testing', desc: 'Book tests and view reports' },
-    { id: 'MK', title: 'Marketplace', desc: 'Buy seeds, fertilizers, etc.' },
-    { id: 'LB', title: 'Labour Hiring', desc: 'Post jobs and hire workers' },
-    { id: 'EQ', title: 'Equipment Rental', desc: 'Rent machinery for your farm' },
-    { id: 'PR', title: 'Produce Sales', desc: 'List your harvest and negotiate' },
+    ['ST', 'Soil Testing', 'Bookings', '/soil-testing'],
+    ['MK', 'Marketplace', 'Orders', '/marketplace'],
+    ['LB', 'Labour Hiring', 'Jobs posted', '/labour'],
+    ['EQ', 'Equipment Rental', 'Reservations', '/equipment'],
+    ['PR', 'Produce Sales', 'Batches listed', '/produce'],
   ],
-  LABOURER: [
-    { id: 'LB_WORKER', title: 'Job Board', desc: 'Find and accept farm jobs' },
-  ],
+  LABOURER: [['LB_WORKER', 'Job Board', 'Accepted jobs', '/labourer/jobs']],
   VENDOR: [
-    { id: 'MK_VENDOR', title: 'My Shop', desc: 'Manage your product listings and orders' },
-    { id: 'EQ_OWNER', title: 'My Equipment', desc: 'List machinery for rental' }, // Vendors can also be equipment owners
+    ['MK_VENDOR', 'My Shop', 'Orders placed', '/vendor/shop'],
+    ['EQ_OWNER', 'My Equipment', 'Requests pending approval', '/vendor/equipment'],
   ],
-  TEST_CENTER: [
-    { id: 'ST_CENTER', title: 'Test Queue', desc: 'Manage sample tests and upload reports' },
-  ],
-  BUYER: [
-    { id: 'PR_BUYER', title: 'Produce Market', desc: 'Browse and negotiate for harvest batches' },
-  ],
-  ADMIN: [
-    { id: 'ADMIN_PANEL', title: 'System Admin', desc: 'Manage users and platform settings' }
-  ]
+  TEST_CENTER: [['ST_CENTER', 'Test Queue', 'Bookings to process', '/test-center']],
+  BUYER: [['PR_BUYER', 'Produce Market', 'Purchase agreements', '/buyer/produce']],
+  ADMIN: [['ADMIN_PANEL', 'System Admin', 'Active users', '/admin']],
 };
 
 export default function Dashboard({ user }) {
-  const [activeRoleView, setActiveRoleView] = useState(user.roles[0] || '');
-
-  if (!user) return null;
-
-  const currentModules = MODULES[activeRoleView] || [];
-
+  const [chosen, setChosen] = useState(() => localStorage.getItem('agri-view-' + user.id));
+  const role = user.roles.includes(chosen) ? chosen : user.roles[0];
+  const metrics = useQuery('/platform/dashboard', {});
   return (
-    <div className="max-w-6xl mx-auto mt-6">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-agriBorder pb-4">
-        <h2 className="text-2xl font-bold text-agriText">Welcome, {user.email.split('@')[0]}</h2>
-
-        {user.roles.length > 1 && (
-          <div className="mt-4 md:mt-0 flex items-center space-x-3">
-            <span className="text-gray-600 font-medium">Switch View:</span>
-            <select
-              className="p-2 border border-agriBorder rounded bg-white text-agriText focus:outline-none focus:border-agriGreen"
-              value={activeRoleView}
-              onChange={(e) => setActiveRoleView(e.target.value)}
-            >
-              {user.roles.map(r => (
-                <option key={r} value={r}>{r.replace('_', ' ')}</option>
-              ))}
-            </select>
-          </div>
+    <div className="mx-auto max-w-6xl space-y-5 py-6">
+      <header className="flex flex-wrap items-end justify-between gap-4 border-b border-agriBorder pb-5">
+        <div>
+          <h1 className="text-3xl font-bold">Welcome, {user.email.split('@')[0]}</h1>
+          {role && <p className="mt-1 font-semibold text-agriGreen">{role.replaceAll('_', ' ')} dashboard</p>}
+        </div>
+        {user.roles.length > 1 && <Field label="Switch view">
+          <select value={role} onChange={(event) => {
+            setChosen(event.target.value);
+            localStorage.setItem('agri-view-' + user.id, event.target.value);
+          }}>
+            {user.roles.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+          </select>
+        </Field>}
+      </header>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {(modules[role] || []).map(([key, title, label, href]) =>
+          <Link key={key} to={href} className="module-panel block hover:border-agriGreen hover:shadow-md">
+            <h2 className="text-lg font-bold text-agriGreen">{title} <span aria-hidden="true">→</span></h2>
+            {metrics.data[key] !== undefined && <p><strong>{metrics.data[key]}</strong> {label.toLowerCase()}</p>}
+          </Link>
         )}
       </div>
-
-      <div className="mb-6">
-        <h3 className="text-xl font-bold text-agriGreen mb-4">{activeRoleView.replace('_', ' ')} Dashboard</h3>
-
-        {currentModules.length === 0 ? (
-          <div className="bg-white p-6 border border-agriBorder rounded text-center text-gray-500">
-            No modules available for this role yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentModules.map(mod => (
-              <div
-                key={mod.id}
-                onClick={() => {
-                  if (mod.id === 'ST') window.location.href = '/soil-testing';
-                  if (mod.id === 'ST_CENTER') window.location.href = '/test-center';
-                  if (mod.id === 'MK_VENDOR') window.location.href = '/vendor/shop';
-                  if (mod.id === 'EQ_OWNER') window.location.href = '/vendor/equipment';
-                }}
-                className="bg-white border border-agriBorder rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-between"
-              >
-                <div>
-                  <h4 className="text-lg font-bold text-agriText mb-2">{mod.title}</h4>
-                  <p className="text-gray-600 text-sm mb-4">{mod.desc}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    if (mod.id === 'ST') window.location.href = '/soil-testing';
-                    if (mod.id === 'ST_CENTER') window.location.href = '/test-center';
-                    if (mod.id === 'MK_VENDOR') window.location.href = '/vendor/shop';
-                    if (mod.id === 'EQ_OWNER') window.location.href = '/vendor/equipment';
-                  }}
-                  className="self-start text-agriGreen font-bold hover:underline"
-                >
-                  Open Module &rarr;
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {!role && <p>Your account has no module permissions. Contact an administrator.</p>}
     </div>
   );
 }

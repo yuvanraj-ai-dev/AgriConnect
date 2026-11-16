@@ -2,6 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .module-panel {
+    @apply space-y-3 rounded-lg border border-agriBorder bg-white p-4 shadow-sm sm:p-5;
+  }
+  .module-field {
+    @apply flex flex-col gap-1 text-sm font-semibold text-zinc-900;
+  }
+  .module-field :is(input, select, textarea) {
+    @apply w-full rounded-md border border-gray-500 bg-white px-3 py-2 font-normal text-zinc-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-agriGreen;
+  }
+  .module-button {
+    @apply inline-flex min-h-[44px] items-center justify-center rounded-md bg-green-800 px-4 py-2 text-sm font-semibold text-white hover:bg-green-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-900 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .module-button.secondary {
+    @apply border border-green-800 bg-white text-green-900 hover:bg-green-50;
+  }
+  .module-status {
+    @apply inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-950;
+  }
+}
+
 body {
   background-color: #f9f9f9;
   color: #333333;

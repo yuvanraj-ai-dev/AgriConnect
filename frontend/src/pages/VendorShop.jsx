@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import api from '../services/api';
+import { Field, PhotoUpload } from '../moduleUi';
 
 const PRODUCT_CATEGORIES = [
   'Fertilizer',
@@ -41,6 +42,7 @@ export default function VendorShop({ user, initialTab }) {
   const [activeTab, setActiveTab] = useState(activeTabParam);
 
   const [products, setProducts] = useState([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [machinery, setMachinery] = useState([]);
   const [stats, setStats] = useState({
     totalProducts: 0,
@@ -83,6 +85,7 @@ export default function VendorShop({ user, initialTab }) {
     type: 'Tractor',
     dailyRate: '',
     securityDeposit: '0',
+    depositTerms: '',
     location: '',
     operationalStatus: 'AVAILABLE',
     instantApproval: false,
@@ -166,7 +169,7 @@ export default function VendorShop({ user, initialTab }) {
       category: prod.category || 'Fertilizer',
       brand: prod.brand || '',
       description: prod.description || '',
-      price: prod.price || '',
+      price: prod.price ?? '',
       unit: prod.unit || '50kg Bag',
       stockQuantity: prod.stockQuantity !== undefined ? String(prod.stockQuantity) : '',
       safetyWarning: prod.safetyWarning || '',
@@ -177,7 +180,7 @@ export default function VendorShop({ user, initialTab }) {
 
   const handleProductSubmit = async (e) => {
     e.preventDefault();
-    if (!productForm.title || !productForm.price || !productForm.unit) {
+    if (!productForm.title || productForm.price === '' || !productForm.unit) {
       alert('Please fill all required fields (Name, Price, Unit).');
       return;
     }
@@ -186,7 +189,10 @@ export default function VendorShop({ user, initialTab }) {
       setActionLoading(true);
       setError(null);
       if (editingProduct) {
-        const res = await api.put(`/vendor/products/${editingProduct.id}`, productForm);
+        const res = await api.put(`/vendor/products/${editingProduct.id}`, {
+          ...productForm,
+          expectedUpdatedAt: editingProduct.updatedAt,
+        });
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? res.data : p));
         showNotification('Product updated successfully!');
       } else {
@@ -241,6 +247,7 @@ export default function VendorShop({ user, initialTab }) {
       type: 'Tractor',
       dailyRate: '',
       securityDeposit: '0',
+      depositTerms: '',
       location: '',
       operationalStatus: 'AVAILABLE',
       instantApproval: false,
@@ -257,6 +264,7 @@ export default function VendorShop({ user, initialTab }) {
       type: item.type || 'Tractor',
       dailyRate: item.dailyRate || '',
       securityDeposit: item.securityDeposit !== undefined ? String(item.securityDeposit) : '0',
+      depositTerms: item.depositTerms || '',
       location: item.location || '',
       operationalStatus: item.operationalStatus || 'AVAILABLE',
       instantApproval: Boolean(item.instantApproval),
@@ -372,12 +380,12 @@ export default function VendorShop({ user, initialTab }) {
           <p className="text-sm text-gray-500">
             List and manage your agricultural products (fertilizers, seeds, inputs) and rental machinery.
           </p>
-          <div className="text-[11px] text-gray-400 mt-1 font-mono">
-            Backend API: {api.defaults.baseURL || 'http://localhost:5000/api'}
-          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link className="module-button secondary" to={activeTab === 'products' ? '/vendor/orders' : '/vendor/reservations'}>
+            {activeTab === 'products' ? 'View shop orders' : 'Manage reservations'}
+          </Link>
           {activeTab === 'products' ? (
             <button
               onClick={openAddProductModal}
@@ -950,6 +958,7 @@ export default function VendorShop({ user, initialTab }) {
                   type="text"
                   placeholder="e.g. Keep away from direct sunlight and children. Wear gloves during application."
                   value={productForm.safetyWarning}
+                  required={productForm.category === 'Pesticide'}
                   onChange={e => setProductForm({ ...productForm, safetyWarning: e.target.value })}
                   className="w-full p-2.5 border border-agriBorder rounded-lg text-sm focus:border-agriGreen focus:outline-none"
                 />
@@ -984,6 +993,8 @@ export default function VendorShop({ user, initialTab }) {
                 />
               </div>
 
+              <PhotoUpload onBusyChange={setUploadingPhoto}
+                onUpload={(imageUrl) => setProductForm((value) => ({ ...value, imageUrl }))} />
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-agriBorder">
                 <button
                   type="button"
@@ -994,7 +1005,7 @@ export default function VendorShop({ user, initialTab }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={actionLoading}
+                  disabled={actionLoading || uploadingPhoto}
                   className="bg-agriGreen text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 disabled:opacity-50"
                 >
                   {actionLoading ? 'Saving...' : editingProduct ? 'Save Changes' : 'Add to Shop'}
@@ -1152,6 +1163,14 @@ export default function VendorShop({ user, initialTab }) {
                 />
               </div>
 
+              <Field label="Security deposit terms">
+                <textarea rows="2" maxLength="1500" value={machineryForm.depositTerms}
+                  placeholder="When the deposit is due and how it is returned"
+                  onChange={(event) => setMachineryForm({ ...machineryForm, depositTerms: event.target.value })} />
+              </Field>
+              <PhotoUpload onBusyChange={setUploadingPhoto}
+                onUpload={(imageUrl) => setMachineryForm((value) => ({ ...value, imageUrl }))} />
+
               {/* Instant Auto-Approval Checkbox (REQ-EQ-01, REQ-EQ-10) */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <label className="flex items-start gap-2.5 cursor-pointer">
@@ -1182,7 +1201,7 @@ export default function VendorShop({ user, initialTab }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={actionLoading}
+                  disabled={actionLoading || uploadingPhoto}
                   className="bg-agriGreen text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-opacity-90 disabled:opacity-50"
                 >
                   {actionLoading ? 'Saving...' : editingMachinery ? 'Save Changes' : 'List Machinery'}

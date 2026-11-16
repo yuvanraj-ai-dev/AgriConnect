@@ -2,23 +2,24 @@ const express = require('express');
 const router = express.Router();
 const vendorController = require('../controllers/vendorController');
 const { authenticateToken, requireRole } = require('../middleware/authMiddleware');
+const { route } = require('../http');
 
 // Base authentication applied to all vendor routes
-router.use(authenticateToken);
+router.use(authenticateToken, requireRole(['VENDOR', 'ADMIN']));
 
 // Stats
-router.get('/stats', vendorController.getVendorStats);
+router.get('/stats', route(vendorController.getVendorStats));
 
 // Products (Fertilizers & Inputs)
-router.get('/products', vendorController.getProducts);
-router.post('/products', vendorController.createProduct);
-router.put('/products/:id', vendorController.updateProduct);
-router.delete('/products/:id', vendorController.deleteProduct);
+router.get('/products', route(vendorController.getProducts));
+router.post('/products', route(vendorController.createProduct));
+router.put('/products/:id', route(vendorController.updateProduct));
+router.delete('/products/:id', route(vendorController.deleteProduct));
 
 // Machinery & Equipment (Rental)
-router.get('/machinery', vendorController.getMachinery);
-router.post('/machinery', vendorController.createMachinery);
-router.put('/machinery/:id', vendorController.updateMachinery);
-router.delete('/machinery/:id', vendorController.deleteMachinery);
+router.get('/machinery', route(vendorController.getMachinery));
+router.post('/machinery', route(vendorController.createMachinery));
+router.put('/machinery/:id', route(vendorController.updateMachinery));
+router.delete('/machinery/:id', route(vendorController.deleteMachinery));
 
 module.exports = router;

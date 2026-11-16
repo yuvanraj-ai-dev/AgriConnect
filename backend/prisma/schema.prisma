@@ -8,28 +8,54 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  roles        String[]
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  roles            String[]
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   soilTestCenter   SoilTestCenter?
   soilTestRequests SoilTestRequest[]
   products         Product[]
   machinery        Machinery[]
+  deletedAt        DateTime?
+  sessions         Session[]
+  labourProfile    LabourProfile?
+  cart             CartItem[]
+  jobs             LabourJob[]
+  produceListings  ProduceListing[]
 }
 
-// Minimal models for now, we will add more for other modules later.
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  lastActiveAt DateTime @default(now())
+
+  @@index([lastActiveAt])
+  @@index([userId])
+}
+
+model AccessRole {
+  name        String   @id
+  permissions String[]
+}
+
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String
-  message   String
-  read      Boolean  @default(false)
-  channel   String
-  createdAt DateTime @default(now())
+  id                 String    @id @default(uuid())
+  userId             String
+  type               String
+  message            String
+  read               Boolean   @default(false)
+  channel            String
+  createdAt          DateTime  @default(now())
+  emailedAt          DateTime?
+  emailAttempts      Int       @default(0)
+  emailNextAttemptAt DateTime?
+
+  @@index([userId, createdAt])
+  @@index([emailedAt, emailNextAttemptAt, emailAttempts])
 }
 
 model AuditLog {
@@ -40,60 +66,275 @@ model AuditLog {
 }
 
 model SoilTestCenter {
-  id        String   @id @default(uuid())
-  name      String
-  location  String
-  agentId   String   @unique
-  agent     User     @relation(fields: [agentId], references: [id])
-  requests  SoilTestRequest[]
-  createdAt DateTime @default(now())
+  id            String            @id @default(uuid())
+  name          String
+  location      String
+  agentId       String            @unique
+  agent         User              @relation(fields: [agentId], references: [id])
+  requests      SoilTestRequest[]
+  createdAt     DateTime          @default(now())
+  dailyCapacity Int               @default(10)
+  accredited    Boolean           @default(false)
 }
 
 model SoilTestRequest {
-  id        String   @id @default(uuid())
-  farmerId  String
-  farmer    User     @relation(fields: [farmerId], references: [id])
-  centerId  String
-  center    SoilTestCenter @relation(fields: [centerId], references: [id])
-  status    String   @default("PENDING")
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String            @id @default(uuid())
+  farmerId    String
+  farmer      User              @relation(fields: [farmerId], references: [id])
+  centerId    String
+  center      SoilTestCenter    @relation(fields: [centerId], references: [id])
+  status      String            @default("PENDING")
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  farmAddress String?
+  cropHistory String?
+  pickupAt    DateTime?
+  report      SoilHealthReport?
+
+  @@index([centerId, pickupAt, status])
+  @@index([farmerId, createdAt])
+}
+
+model SoilHealthReport {
+  bookingId  String          @id
+  booking    SoilTestRequest @relation(fields: [bookingId], references: [id])
+  fileRef    String
+  uploadedBy String
+  uploadedAt DateTime        @default(now())
 }
 
 model Product {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   vendorId      String
-  vendor        User     @relation(fields: [vendorId], references: [id])
+  vendor        User       @relation(fields: [vendorId], references: [id])
   title         String
-  category      String   // FERTILIZER, SEED, PESTICIDE, TOOL, BIO_ORGANIC, OTHER
+  category      String // FERTILIZER, SEED, PESTICIDE, TOOL, BIO_ORGANIC, OTHER
   brand         String?
   description   String?
   price         Float
-  unit          String   // e.g. "50kg Bag", "1kg Packet", "Liter", "Piece"
-  stockQuantity Int      @default(0)
-  safetyWarning String?  // Specific warning/safety instructions (BR-MK-02, REQ-MK-10)
+  unit          String // e.g. "50kg Bag", "1kg Packet", "Liter", "Piece"
+  stockQuantity Int        @default(0)
+  safetyWarning String? // Specific warning/safety instructions (BR-MK-02, REQ-MK-10)
   imageUrl      String?
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  cartItems     CartItem[]
+  deletedAt     DateTime?
+
+  @@index([active, category, createdAt])
+  @@index([vendorId])
 }
 
 model Machinery {
-  id                String   @id @default(uuid())
+  id                String                 @id @default(uuid())
   ownerId           String
-  owner             User     @relation(fields: [ownerId], references: [id])
+  owner             User                   @relation(fields: [ownerId], references: [id])
   name              String
-  type              String   // Tractor, Harvester, Power Tiller, Rotavator, Sprayer, Seed Drill, Other
-  dailyRate         Float    // Rental rate per day (minimum 1 day / 8 hours per BR-EQ-01)
-  securityDeposit   Float    @default(0) // Security deposit terms (BR-EQ-02)
+  type              String // Tractor, Harvester, Power Tiller, Rotavator, Sprayer, Seed Drill, Other
+  dailyRate         Float // Rental rate per day (minimum 1 day / 8 hours per BR-EQ-01)
+  securityDeposit   Float                  @default(0) // Security deposit terms (BR-EQ-02)
   location          String
-  operationalStatus String   @default("AVAILABLE") // AVAILABLE, UNDER_MAINTENANCE, RENTED
-  instantApproval   Boolean  @default(false) // REQ-EQ-01, REQ-EQ-10
-  specifications    String?  // Horsepower, model year, fuel policy, driver included
+  operationalStatus String                 @default("AVAILABLE") // AVAILABLE, UNDER_MAINTENANCE, RENTED
+  instantApproval   Boolean                @default(false) // REQ-EQ-01, REQ-EQ-10
+  specifications    String? // Horsepower, model year, fuel policy, driver included
   imageUrl          String?
-  active            Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  active            Boolean                @default(true)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  depositTerms      String?
+  reservations      EquipmentReservation[]
+  blockedDates      EquipmentBlock[]
+  deletedAt         DateTime?
+
+  @@index([active, operationalStatus, type])
+  @@index([ownerId])
 }
 
+model CartItem {
+  farmerId  String
+  farmer    User    @relation(fields: [farmerId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+
+  @@id([farmerId, productId])
+}
+
+model MarketOrder {
+  id                String            @id @default(uuid())
+  farmerId          String
+  requestKey        String
+  gatewayOrderId    String?           @unique
+  gatewayLeaseUntil DateTime?
+  paymentId         String?           @unique
+  status            String            @default("PENDING_PAYMENT")
+  subtotalPaise     Int
+  taxPaise          Int               @default(0)
+  expiresAt         DateTime
+  createdAt         DateTime          @default(now())
+  paidAt            DateTime?
+  items             MarketOrderItem[]
+
+  @@unique([farmerId, requestKey])
+  @@index([farmerId, createdAt])
+  @@index([status, expiresAt])
+}
+
+model MarketOrderItem {
+  id        String      @id @default(uuid())
+  orderId   String
+  order     MarketOrder @relation(fields: [orderId], references: [id])
+  productId String
+  vendorId  String
+  title     String
+  unitPaise Int
+  quantity  Int
+
+  @@index([orderId])
+  @@index([vendorId])
+}
+
+model LabourProfile {
+  userId         String   @id
+  user           User     @relation(fields: [userId], references: [id])
+  skills         String[]
+  available      Boolean  @default(true)
+  dailyWagePaise Int
+}
+
+model LabourJob {
+  id                String             @id @default(uuid())
+  farmerId          String
+  farmer            User               @relation(fields: [farmerId], references: [id])
+  category          String
+  location          String
+  workerCount       Int
+  filledSlots       Int                @default(0)
+  dailyWagePaise    Int
+  startDate         DateTime           @db.Date
+  endDate           DateTime           @db.Date
+  status            String             @default("OPEN")
+  shortfallNotified Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  workers           LabourAssignment[]
+
+  @@index([status, startDate])
+  @@index([farmerId, createdAt])
+}
+
+model LabourAssignment {
+  jobId     String
+  job       LabourJob @relation(fields: [jobId], references: [id])
+  workerId  String
+  status    String
+  createdAt DateTime  @default(now())
+
+  @@id([jobId, workerId])
+  @@index([workerId, status])
+}
+
+model EquipmentReservation {
+  id             String    @id @default(uuid())
+  machineId      String
+  machine        Machinery @relation(fields: [machineId], references: [id])
+  farmerId       String
+  startDate      DateTime  @db.Date
+  endDate        DateTime  @db.Date
+  dailyRatePaise Int
+  feePaise       Int
+  depositPaise   Int
+  depositTerms   String
+  status         String
+  createdAt      DateTime  @default(now())
+  confirmedAt    DateTime?
+
+  @@index([machineId, status, startDate, endDate])
+  @@index([farmerId, createdAt])
+}
+
+model EquipmentBlock {
+  id        String    @id @default(uuid())
+  machineId String
+  machine   Machinery @relation(fields: [machineId], references: [id])
+  startDate DateTime  @db.Date
+  endDate   DateTime  @db.Date
+
+  @@index([machineId, startDate, endDate])
+}
+
+model ProduceListing {
+  id               String               @id @default(uuid())
+  farmerId         String
+  farmer           User                 @relation(fields: [farmerId], references: [id])
+  crop             String
+  grade            String
+  quantity         Decimal              @db.Decimal(10, 2)
+  minBatch         Decimal              @db.Decimal(10, 2)
+  basePricePaise   Int
+  location         String
+  allowNegotiation Boolean
+  harvestDate      DateTime?            @db.Date
+  imageUrl         String?
+  active           Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  negotiations     ProduceNegotiation[]
+  agreements       PurchaseAgreement[]
+
+  @@index([active, createdAt])
+  @@index([farmerId, createdAt])
+}
+
+model ProduceNegotiation {
+  id         String             @id @default(uuid())
+  listingId  String
+  listing    ProduceListing     @relation(fields: [listingId], references: [id])
+  buyerId    String
+  quantity   Decimal            @db.Decimal(10, 2)
+  pricePaise Int
+  status     String
+  awaiting   String
+  expiresAt  DateTime
+  updatedAt  DateTime           @updatedAt
+  events     NegotiationEvent[]
+  agreement  PurchaseAgreement?
+
+  @@index([buyerId, updatedAt])
+  @@index([listingId, buyerId, status])
+  @@index([status, expiresAt])
+}
+
+model NegotiationEvent {
+  id            String             @id @default(uuid())
+  sequence      Int                @unique @default(autoincrement())
+  negotiationId String
+  negotiation   ProduceNegotiation @relation(fields: [negotiationId], references: [id])
+  proposerId    String?
+  action        String
+  pricePaise    Int
+  createdAt     DateTime           @default(now())
+
+  @@index([negotiationId, createdAt])
+}
+
+model PurchaseAgreement {
+  id            String              @id @default(uuid())
+  listingId     String
+  listing       ProduceListing      @relation(fields: [listingId], references: [id])
+  negotiationId String?             @unique
+  negotiation   ProduceNegotiation? @relation(fields: [negotiationId], references: [id])
+  buyerId       String
+  farmerId      String
+  requestKey    String?
+  crop          String
+  grade         String
+  quantity      Decimal             @db.Decimal(10, 2)
+  pricePaise    Int
+  totalPaise    Int
+  createdAt     DateTime            @default(now())
+
+  @@unique([buyerId, requestKey])
+  @@index([farmerId, createdAt])
+  @@index([buyerId, createdAt])
+}
