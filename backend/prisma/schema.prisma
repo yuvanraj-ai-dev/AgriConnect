@@ -15,7 +15,7 @@ model User {
   active           Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
-  soilTestCenter   SoilTestCenter?
+  soilTestCenters  SoilTestCenter[]
   soilTestRequests SoilTestRequest[]
   products         Product[]
   machinery        Machinery[]
@@ -69,12 +69,14 @@ model SoilTestCenter {
   id            String            @id @default(uuid())
   name          String
   location      String
-  agentId       String            @unique
+  agentId       String
   agent         User              @relation(fields: [agentId], references: [id])
   requests      SoilTestRequest[]
   createdAt     DateTime          @default(now())
   dailyCapacity Int               @default(10)
   accredited    Boolean           @default(false)
+
+  @@index([agentId])
 }
 
 model SoilTestRequest {

@@ -58,7 +58,7 @@ The repository has been updated with all commits pushed to `origin/main` up to c
   - Submit soil test sample requests with custom field notes.
   - Real-time status tracking (`PENDING`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`).
 - **Test Center Agent Portal (`/test-center`)**:
-  - First-time center registration enforcing a strict 1-to-1 center-to-agent mapping.
+  - One new center registration per agent, with existing center records retained.
   - Dedicated incoming test queue with sample inspection and status updates.
 - **Admin Diagnostics & Reset (`/api/admin/reset-my-test-center`)**:
   - Endpoint to clear orphaned centers during development and testing.
@@ -74,7 +74,7 @@ The repository has been updated with all commits pushed to `origin/main` up to c
 
 ### 4. Cloud Infrastructure & Production Deployment
 - **Dual-Mount Route Architecture**: Backend routes mount simultaneously on `/api/*` and `/*` ensuring total resilience regardless of frontend environment variable configuration.
-- **Render Production Build Optimization**: Automated database schema synchronization using `npx prisma db push --accept-data-loss`.
+- **Render build**: `npm run build` synchronizes the schema and stops if Prisma flags possible data loss.
 - **Vercel Single-Page-App Routing**: Custom `vercel.json` rewrites preventing 404 errors on browser page reloads.
 
 ---
@@ -107,7 +107,7 @@ The repository has been updated with all commits pushed to `origin/main` up to c
 The PostgreSQL database contains the following models located in `backend/prisma/schema.prisma`:
 
 - **`User`**: Account identity, hashed passwords, multi-role array, timestamps, and inverse relations.
-- **`SoilTestCenter`**: Laboratory name, location, and 1-to-1 unique mapping to an agent account.
+- **`SoilTestCenter`**: Laboratory name, location, and owning agent. An agent can register one center; previously registered centers and their bookings are retained.
 - **`SoilTestRequest`**: Sample testing requests linking a farmer to a test center with status tracking and notes.
 - **`Product`**: Vendor agro-inputs, categories, pricing, stock count, unit definitions, and chemical safety alerts.
 - **`Machinery`**: Heavy equipment listings, machine specifications, daily rental fees, security deposits, and operational status.

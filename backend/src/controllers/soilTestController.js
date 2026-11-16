@@ -14,12 +14,15 @@ const confirmed = ['PENDING', 'BOOKING_CONFIRMED'];
 
 exports.createCenter = async (req, res) => {
   const { name, location, dailyCapacity } = req.body;
-  const center = await db.soilTestCenter.create({
-    data: {
-      name: requiredText(name, 'Center name'), location: requiredText(location, 'Location'),
-      dailyCapacity: whole(dailyCapacity ?? 10, 'Daily capacity', 1, 500), agentId: req.user.id,
-    },
-    select: centerSelect,
+  const agentId = req.user.id;
+  const data = {
+    name: requiredText(name, 'Center name'), location: requiredText(location, 'Location'),
+    dailyCapacity: whole(dailyCapacity ?? 10, 'Daily capacity', 1, 500), agentId,
+  };
+  const center = await serializable(async (tx) => {
+    const existing = await tx.soilTestCenter.findFirst({ where: { agentId }, select: { id: true } });
+    check(!existing, 409, 'This account already has a testing center.');
+    return tx.soilTestCenter.create({ data, select: centerSelect });
   });
   res.status(201).json(center);
 };
@@ -29,7 +32,11 @@ exports.getCenters = async (req, res) => {
 };
 
 exports.myCenter = async (req, res) => {
-  res.json(await db.soilTestCenter.findUnique({ where: { agentId: req.user.id }, select: centerSelect }));
+  res.json(await db.soilTestCenter.findFirst({
+    where: { agentId: req.user.id },
+    orderBy: [{ requests: { _count: 'desc' } }, { createdAt: 'asc' }, { id: 'asc' }],
+    select: centerSelect,
+  }));
 };
 
 function pickupFilter(pickupAt) {

@@ -146,6 +146,24 @@ test('release workflows on PostgreSQL', async (suite) => {
     assert.ok(items.some((item) => item.type === 'SOIL_REPORT_READY'));
   });
 
+  await suite.test('existing centers and their bookings survive the one-center registration rule', async () => {
+    const agent = await person('legacy-lab', ['TEST_CENTER']);
+    const registration = { name: 'Soil lab', location: 'Warangal' };
+    const attempts = await Promise.all([0, 1].map(() => post('/soil-test/centers', 'legacy-lab', registration, null)));
+    assert.deepEqual(attempts.map(({ status }) => status).sort(), [201, 409]);
+    const first = attempts.find(({ status }) => status === 201).data;
+    const second = await db.soilTestCenter.create({ data: { ...registration, agentId: agent.id } });
+    const booking = await db.soilTestRequest.create({
+      data: { centerId: second.id, farmerId: users.get('farmer').id },
+    });
+    assert.equal((await get('/soil-test/centers/mine', 'legacy-lab')).id, second.id);
+    const queue = await get('/soil-test/requests?view=center', 'legacy-lab');
+    assert.ok(queue.some((item) => item.id === booking.id && item.center.id === second.id));
+    const centers = await get('/admin/centers', 'admin');
+    assert.ok(centers.some(({ id }) => id === first.id) && centers.some(({ id }) => id === second.id));
+    await post('/soil-test/centers', 'legacy-lab', registration, 409);
+  });
+
   await suite.test('marketplace caps stock, requires acknowledgment, verifies capture and releases holds', async (context) => {
     context.mock.method(globalThis, 'fetch', async (url, options) => {
       const key = url.split('/').at(-1);
