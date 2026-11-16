@@ -1,115 +1,53 @@
-# AgriConnect — Collaborator Deployment Guide
+# AgriConnect Release 1.0 deployment
 
-## Prerequisites
-Make sure you have a free account on these platforms (no card required):
-- [GitHub](https://github.com) — to fork/clone the repo
-- [Neon.tech](https://neon.tech) — free cloud PostgreSQL
-- [Render](https://render.com) — free backend hosting
-- [Vercel](https://vercel.com) — free frontend hosting
+The existing deployment uses Vercel for React, Render for the Express API, and Neon for PostgreSQL. Use a Neon branch and a Vercel preview to test the release before updating the live services.
 
----
+## 1. Database and backend
 
-## Step 1: Fork or Clone the Repository
-If you are a collaborator with write access:
-```bash
-git clone https://github.com/yuvanraj-ai-dev/AgriConnect.git
-cd AgriConnect
-```
-If you want your own copy, click **Fork** on GitHub first, then clone your fork.
+1. Create a Neon branch from the current database and copy its direct PostgreSQL connection string. Render uses `DATABASE_URL` for both the schema update and the API.
+2. In Render, set **Root Directory** to `backend`, **Build Command** to `npm ci --include=dev && npm run build`, and **Start Command** to `npm start`. Use Node.js 20 or later.
+3. Add the backend environment variables listed below. Keep credentials in Render's environment settings.
+4. Build against the Neon branch. `npm run build` generates Prisma Client, applies the schema, and installs the PostgreSQL trigger that keeps the negotiation history append-only. The build stops if Prisma requires approval for a schema change that could lose data.
+5. Verify `GET /api/health` at the Render URL before configuring the frontend.
 
----
+| Render variable | Value |
+|---|---|
+| `DATABASE_URL` | Neon PostgreSQL connection string with TLS enabled |
+| `JWT_SECRET` | Strong random value for signing session tokens |
+| `NODE_ENV` | `production` |
+| `FRONTEND_ORIGIN` | HTTPS Vercel origin, with no trailing slash. Use a comma-separated list for known preview origins. |
+| `CLOUDINARY_URL` | Cloudinary server credentials in the `cloudinary://...` format |
+| `RAZORPAY_KEY_ID` | Razorpay **test-mode** key ID beginning with `rzp_test_` |
+| `RAZORPAY_KEY_SECRET` | Secret paired with the test key |
+| `RAZORPAY_WEBHOOK_SECRET` | Secret you set when registering the test webhook |
+| `MARKETPLACE_TAX_PERCENT` | Optional tax percentage used for marketplace test quotes. Defaults to zero. |
+| `SMTP_HOST`, `SMTP_PORT` | SMTP host and port from the provider. Use Mailtrap Email Sandbox on port `2525` for the Render free-tier demo. |
+| `SMTP_USER`, `SMTP_PASS` | SMTP credentials |
+| `SMTP_FROM` | From address permitted by your SMTP provider |
+| `SMTP_SECURE` | Set to `true` for implicit TLS. Port `465` also enables it automatically. |
 
-## Step 2: Set Up the Database (Neon.tech)
-1. Sign up at [neon.tech](https://neon.tech)
-2. Click **New Project**, give it a name (e.g. `agriconnect`)
-3. Select **PostgreSQL 15+** as the version
-4. Once created, go to the **Dashboard** tab
-5. Click **Connection String** and copy the full URL
-   - It looks like: `postgresql://user:password@host.neon.tech/dbname?sslmode=require`
-6. **Save this string** — you will need it in the next step
+Render free web services block outbound SMTP ports 25, 465, and 587. Mailtrap Email Sandbox captures test messages in its inbox. In-app notifications work independently of SMTP. Background jobs for hold expiry, negotiation expiry, labour shortfalls, and email run while the API is awake and catch up when Render restarts. [Render free-tier limits](https://render.com/docs/free) · [Mailtrap Sandbox SMTP setup](https://docs.mailtrap.io/email-sandbox/setup/sandbox-smtp-integration)
 
----
+## 2. Frontend
 
-## Step 3: Deploy the Backend (Render)
-1. Sign up at [render.com](https://render.com)
-2. Click **New +** → **Web Service**
-3. Connect your GitHub account and select the `AgriConnect` repo
-4. Fill in the settings:
-   | Field | Value |
-   |---|---|
-   | **Root Directory** | `backend` |
-   | **Build Command** | `rm -rf node_modules && npm install && npx prisma generate && npx prisma db push --accept-data-loss` |
-   | **Start Command** | `npm start` |
-   | **Instance Type** | Free |
+In Vercel, set **Root Directory** to `frontend`, **Framework Preset** to **Vite**, **Install Command** to `npm ci --include=dev`, **Build Command** to `npm run build`, and **Output Directory** to `dist`. Set `VITE_API_URL` to your Render HTTPS URL followed by `/api`. Keep the SPA rewrite in `frontend/vercel.json` so direct links and refreshes load correctly.
 
-5. Click **Advanced** → **Add Environment Variables**:
-   | Key | Value |
-   |---|---|
-   | `DATABASE_URL` | *(paste your Neon connection string)* |
-   | `JWT_SECRET` | *(any random string, e.g. `mySecretKey123`)* |
-   | `NODE_ENV` | `production` |
+## 3. Configure providers and administer accounts
 
-6. Click **Create Web Service** and wait for the build
-7. Once deployed, **copy your backend URL** — it looks like `https://your-service.onrender.com`
+- In Razorpay **Test Mode**, enable automatic capture and subscribe to `payment.captured` at `https://<render-service>/api/market/webhook`. Use the configured webhook secret. Test a checkout and confirm the paid order appears in both the farmer and vendor views. A payment captured after its stock hold has expired is flagged for manual reconciliation in the Razorpay test dashboard. [Razorpay Standard Checkout](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps) · [Razorpay webhook verification](https://razorpay.com/docs/webhooks/validate-test)
+- Configure Cloudinary before testing soil report uploads or listing photos. Allow PDF delivery in the Cloudinary product environment if it is disabled. Soil PDFs use authenticated storage. The API verifies booking ownership before streaming a report. [Cloudinary PDF delivery](https://cloudinary.com/guides/web-performance/the-developers-guide-to-pdfs) · [Cloudinary authenticated media](https://cloudinary.com/documentation/control_access_to_media)
+- Register the first administrator's account through the app. From a trusted terminal, set `DATABASE_URL` to the intended environment and run `npm run admin:grant -- admin@example.com` from `backend`. Sign in with that account and use **System administration → Accreditation** to verify each center. Existing center records are retained and start as awaiting accreditation. Existing account holders must sign in again after the session upgrade.
 
----
+## 4. Verify the release
 
-## Step 4: Deploy the Frontend (Vercel)
-1. Sign up at [vercel.com](https://vercel.com)
-2. Click **Add New** → **Project**
-3. Import the `AgriConnect` GitHub repository
-4. Fill in the settings:
-   | Field | Value |
-   |---|---|
-   | **Root Directory** | `frontend` |
-   | **Framework Preset** | Vite |
-   | **Build Command** | *(leave as default: `npm run build`)* |
-   | **Output Directory** | *(leave as default: `dist`)* |
+Use separate test accounts for the farmer, vendor, test center, worker, buyer, and admin.
 
-5. Open **Environment Variables** and add:
-   | Key | Value |
-   |---|---|
-   | `VITE_API_URL` | `https://your-service.onrender.com/api` *(your Render URL + `/api`)* |
+1. Sign in, switch views on a multi-role account, and open the dashboard cards.
+2. Accredit a center, book a pickup at least 48 hours ahead, move it into analysis, and upload and download a PDF report.
+3. List a product, add it to a farmer's cart, verify the stock cap, and place a Razorpay test order. Confirm the vendor sees it.
+4. Invite a worker and accept a job. Verify overlapping dates cannot be accepted twice.
+5. Reserve equipment, approve it as the owner, and view the receipt as the farmer.
+6. Send and accept a produce offer, then verify the agreement and offer history on both accounts.
+7. Confirm in-app notifications and check the Mailtrap inbox. Repeat the main flows on your phone.
 
-6. Go to **Settings → General → Build & Development Settings**
-   - Toggle ON the **Install Command** override and set it to:
-     ```
-     rm -rf node_modules package-lock.json && npm install
-     ```
-   > [!IMPORTANT]
-   > This step is required to avoid a "Permission denied" error on Vite. Do not skip it.
-
-7. Click **Deploy** and wait for it to go live
-
----
-
-## Step 5: Verify Deployment
-Once both are deployed, open your Vercel URL in the browser:
-- You should see the **AgriConnect Login page**
-- Register a new account, log in, and verify the Dashboard loads
-
----
-
-## Future Updates (Day-to-Day Workflow)
-Whenever new code is pushed to the `main` branch on GitHub:
-- ✅ **Vercel** auto-rebuilds the frontend
-- ✅ **Render** auto-deploys the backend (including any new DB tables via `prisma db push`)
-- ✅ **Neon** keeps all data safe — nothing to do
-
-The only time you need to manually visit Render or Vercel is when adding **new environment variables** (e.g. Cloudinary keys, Razorpay keys, email SMTP settings for future modules).
-
----
-
-## Environment Variables Reference (Full List)
-| Variable | Used In | Description |
-|---|---|---|
-| `DATABASE_URL` | Render (backend) | Neon PostgreSQL connection string |
-| `JWT_SECRET` | Render (backend) | Any random secret string for signing tokens |
-| `NODE_ENV` | Render (backend) | Set to `production` |
-| `VITE_API_URL` | Vercel (frontend) | Full backend URL + `/api` |
-| `CLOUDINARY_URL` | Render (backend) | *(Added in Module 1 — Soil Testing)* |
-| `RAZORPAY_KEY_ID` | Render (backend) | *(Added in Module 2 — Marketplace)* |
-| `RAZORPAY_SECRET` | Render (backend) | *(Added in Module 2 — Marketplace)* |
-| `EMAIL_HOST` | Render (backend) | *(Added later — Email/Notifications)* |
-| `EMAIL_USER` | Render (backend) | *(Added later — Email/Notifications)* |
-| `EMAIL_PASS` | Render (backend) | *(Added later — Email/Notifications)* |
+For automated API checks, build the backend against a **disposable local PostgreSQL database** whose name includes `test`, then set `TEST_DATABASE_URL` to that same database and run `npm test` from `backend`. The tests use a simulated Razorpay gateway and local PDF storage.
