@@ -1,8 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { db, serializable } = require('../db');
-const { check } = require('../http');
-const { PUBLIC_ROLES, credentials, effectiveRoles } = require('../access');
+const { check, requiredText } = require('../http');
+const { PUBLIC_ROLES, credentials, effectiveRoles, profileSelect } = require('../access');
 
 async function register(req, res) {
   const { email, password } = credentials(req.body);
@@ -30,7 +30,7 @@ async function login(req, res) {
   const token = jwt.sign({ sid: session.id }, process.env.JWT_SECRET, { subject: user.id, algorithm: 'HS256' });
   res.json({
     token,
-    user: { id: user.id, email: user.email, roles: await effectiveRoles(user.roles) },
+    user: { id: user.id, email: user.email, nickname: user.nickname, roles: await effectiveRoles(user.roles) },
   });
 }
 
@@ -38,9 +38,22 @@ function getMe(req, res) {
   res.json(req.user);
 }
 
+async function updateProfile(req, res) {
+  const nickname = requiredText(req.body?.nickname, 'Nickname', 40);
+  const address = req.body?.address;
+  check(address == null || (typeof address === 'string' && address.trim().length <= 500),
+    400, 'Address must be at most 500 characters.');
+  const profile = await db.user.update({
+    where: { id: req.user.id, active: true, deletedAt: null },
+    data: { nickname, address: address?.trim() || null },
+    select: profileSelect,
+  });
+  res.json(profile);
+}
+
 async function logout(req, res) {
   await db.session.deleteMany({ where: { id: req.sessionId } });
   res.sendStatus(204);
 }
 
-module.exports = { register, login, getMe, logout };
+module.exports = { register, login, getMe, updateProfile, logout };

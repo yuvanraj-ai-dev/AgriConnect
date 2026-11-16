@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import api from '../services/api';
-import { ErrorMessage, Field, formValues, ModulePage, Panel, QueryState, Status, timeLabel, useAction, useQuery } from '../moduleUi';
+import { AddressField, ErrorMessage, Field, formValues, ModulePage, Panel, QueryState, Status, timeLabel, useAction, useQuery } from '../moduleUi';
 
-export default function FarmerSoilTest() {
+export default function FarmerSoilTest({ savedAddress }) {
   const centers = useQuery('/soil-test/centers', []);
   const bookings = useQuery('/soil-test/requests?view=farmer', []);
   const action = useAction();
@@ -64,9 +64,7 @@ export default function FarmerSoilTest() {
             {alternatives.map((item) => <button className="module-button secondary" key={item.id} type="button"
               onClick={() => setCenter(item.id)}>{item.name}</button>)}
           </div>}
-          <Field label="Farm address">
-            <textarea name="farmAddress" required maxLength="500" aria-invalid={field === 'Farm address'} />
-          </Field>
+          <AddressField label="Farm address" name="farmAddress" savedAddress={savedAddress} multiline required maxLength="500" aria-invalid={field === 'Farm address'} />
           {field === 'Farm address' && <ErrorMessage>{action.error}</ErrorMessage>}
           <Field label="Crop history">
             <textarea name="cropHistory" required maxLength="1000" aria-invalid={field === 'Crop history'} />

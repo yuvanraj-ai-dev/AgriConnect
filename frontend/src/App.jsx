@@ -12,6 +12,7 @@ import { FarmerLabour, LabourerJobs } from './pages/Labour';
 import { FarmerEquipment, OwnerEquipment } from './pages/Equipment';
 import Produce from './pages/Produce';
 import Notifications from './pages/Notifications';
+import Profile from './pages/Profile';
 import Admin from './pages/Admin';
 import { ErrorMessage } from './moduleUi';
 import api from './services/api';
@@ -105,14 +106,20 @@ function App() {
 
   if (loading) return <p role="status" className="p-8 text-center">Loading AgriConnect…</p>;
 
+  const displayName = user?.nickname || user?.email.split('@')[0];
+
   return <BrowserRouter>
     <div className="min-h-screen bg-agriBg text-agriText">
       <header className="bg-green-900 text-white shadow-sm">
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3" aria-label="Main navigation">
           <Link to={user ? '/dashboard' : '/'} className="text-xl font-bold">AgriConnect</Link>
-          {user && <div className="flex flex-wrap items-center gap-3">
+          {user && <div className="ml-auto flex flex-wrap items-center gap-3">
             <Link to="/notifications" className="py-2 font-semibold hover:underline">Notifications</Link>
             <button className="module-button secondary" disabled={loggingOut} onClick={logout}>Sign out</button>
+            <Link to="/profile" aria-label="My profile" className="flex items-center gap-2 rounded-full border border-green-300 px-2 py-1 hover:bg-green-800">
+              <span aria-hidden="true" className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-green-100 font-bold text-green-950">{Array.from(displayName)[0]?.toUpperCase()}</span>
+              <span className="max-w-28 truncate font-semibold sm:max-w-44">{displayName}</span>
+            </Link>
           </div>}
         </nav>
       </header>
@@ -125,18 +132,19 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
           <Route path="/dashboard" element={protectedPage(user && <Dashboard user={user} />)} />
+          <Route path="/profile" element={protectedPage(user && <Profile key={user.id} user={user} onSave={(profile) => setUser((current) => ({ ...current, ...profile }))} />)} />
           <Route path="/notifications" element={protectedPage(<Notifications />)} />
-          <Route path="/soil-testing" element={protectedPage(<FarmerSoilTest />, 'FARMER')} />
+          <Route path="/soil-testing" element={protectedPage(<FarmerSoilTest savedAddress={user?.address} />, 'FARMER')} />
           <Route path="/test-center" element={protectedPage(<AgentSoilTest />, 'TEST_CENTER')} />
           <Route path="/vendor/shop" element={protectedPage(<VendorShop key="products" user={user} />, 'VENDOR')} />
           <Route path="/vendor/equipment" element={protectedPage(<VendorShop key="machinery" user={user} initialTab="machinery" />, 'VENDOR')} />
           <Route path="/vendor/orders" element={protectedPage(<VendorOrders />, 'VENDOR')} />
           <Route path="/vendor/reservations" element={protectedPage(<OwnerEquipment />, 'VENDOR')} />
           <Route path="/marketplace" element={protectedPage(<Marketplace />, 'FARMER')} />
-          <Route path="/labour" element={protectedPage(<FarmerLabour />, 'FARMER')} />
+          <Route path="/labour" element={protectedPage(<FarmerLabour savedAddress={user?.address} />, 'FARMER')} />
           <Route path="/labourer/jobs" element={protectedPage(<LabourerJobs />, 'LABOURER')} />
           <Route path="/equipment" element={protectedPage(<FarmerEquipment />, 'FARMER')} />
-          <Route path="/produce" element={protectedPage(<Produce key="farmer" view="farmer" />, 'FARMER')} />
+          <Route path="/produce" element={protectedPage(<Produce key="farmer" view="farmer" savedAddress={user?.address} />, 'FARMER')} />
           <Route path="/buyer/produce" element={protectedPage(<Produce key="buyer" view="buyer" />, 'BUYER')} />
           <Route path="/admin" element={protectedPage(<Admin user={user} />, 'ADMIN')} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { dateLabel, ErrorMessage, Field, formValues, ModulePage, Panel, QueryState, rupees, Status, toDay, today, useAction, useQuery } from '../moduleUi';
+import { AddressField, dateLabel, ErrorMessage, Field, formValues, ModulePage, Panel, QueryState, rupees, Status, toDay, today, useAction, useQuery } from '../moduleUi';
 
 function JobDetails({ job }) {
   return <>
@@ -15,13 +15,13 @@ function JobDetails({ job }) {
   </>;
 }
 
-function JobForm({ job, onSave, onCancel, busy }) {
+function JobForm({ job, onSave, onCancel, busy, savedAddress }) {
   return <form key={job?.id || 'new'} className="space-y-3" onSubmit={(event) => {
     event.preventDefault();
     onSave(formValues(event), event.currentTarget);
   }}>
     <Field label="Job category"><input name="category" defaultValue={job?.category} required maxLength="200" /></Field>
-    <Field label="Farm location"><input name="location" defaultValue={job?.location} required maxLength="500" /></Field>
+    <AddressField label="Farm location" name="location" defaultValue={job?.location} savedAddress={savedAddress} required maxLength="500" />
     <div className="grid grid-cols-2 gap-3">
       <Field label="Workers needed"><input name="workerCount" type="number" min="1" max="500" defaultValue={job?.workerCount} required /></Field>
       <Field label="Daily wage (₹)"><input name="dailyWage" type="number" min="0.01" step="0.01" defaultValue={job && job.dailyWagePaise / 100} required /></Field>
@@ -35,7 +35,7 @@ function JobForm({ job, onSave, onCancel, busy }) {
   </form>;
 }
 
-export function FarmerLabour() {
+export function FarmerLabour({ savedAddress }) {
   const [skill, setSkill] = useState('');
   const [editing, setEditing] = useState(null);
   const [selectedJob, setSelectedJob] = useState('');
@@ -56,7 +56,7 @@ export function FarmerLabour() {
     <ErrorMessage>{action.error}</ErrorMessage>
     <div className="grid items-start gap-5 lg:grid-cols-2">
       <Panel title={editing ? 'Edit job' : 'Post a job'}>
-        <JobForm job={editing} busy={action.busy} onCancel={() => setEditing(null)} onSave={(data, form) =>
+        <JobForm job={editing} busy={action.busy} savedAddress={savedAddress} onCancel={() => setEditing(null)} onSave={(data, form) =>
           mutate(editing ? 'put' : 'post', '/labour/jobs' + (editing ? '/' + editing.id : ''), data, () => {
             form.reset();
             setEditing(null);

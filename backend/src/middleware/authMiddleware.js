@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { db } = require('../db');
-const { SESSION_LENGTH, effectiveRoles, userSelect } = require('../access');
+const { SESSION_LENGTH, effectiveRoles, userSelect, profileSelect } = require('../access');
 const { route, check } = require('../http');
 
 const authenticateToken = route(async (req, res, next) => {
@@ -26,7 +26,7 @@ const authenticateToken = route(async (req, res, next) => {
     data: { lastActiveAt: now },
   });
   if (!session.count) return expired();
-  const user = await db.user.findUnique({ where: { id: claims.sub }, select: userSelect });
+  const user = await db.user.findUnique({ where: { id: claims.sub }, select: { ...userSelect, ...profileSelect } });
   if (!user?.active) return expired();
 
   req.user = { ...user, assignedRoles: user.roles, roles: await effectiveRoles(user.roles) };

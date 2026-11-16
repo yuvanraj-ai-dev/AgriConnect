@@ -119,6 +119,24 @@ test('release workflows on PostgreSQL', async (suite) => {
     assert.equal((await get('/auth/me', next.token, 401)).code, 'SESSION_EXPIRED');
   });
 
+  await suite.test('profile details are optional at signup and only editable by their owner', async () => {
+    const account = await person('profile-farmer', ['FARMER']);
+    const path = '/auth/me/profile';
+    const address = 'Sample Farm\nWarangal';
+    assert.equal((await get('/auth/me', 'profile-farmer')).address, null);
+    await patch(path, null, { nickname: 'Guest', address }, 401);
+    await patch(path, 'profile-farmer', { nickname: ' ', address }, 400);
+    await patch(path, 'profile-farmer', { nickname: 'Farmer', address: 'a'.repeat(501) }, 400);
+    assert.deepEqual(await patch(path, 'profile-farmer', {
+      nickname: ' Farmer ', address: ' ' + address + ' ', roles: ['ADMIN'], userId: users.get('neighbor').id,
+    }), { nickname: 'Farmer', address });
+    assert.equal((await get('/auth/me', 'profile-farmer')).address, address);
+    assert.equal((await get('/auth/me', 'neighbor')).address, null);
+    assert.deepEqual((await get('/auth/me', 'profile-farmer')).roles, ['FARMER']);
+    assert.equal((await post('/auth/login', null, { email: account.email, password: account.password }, 200)).user.nickname, 'Farmer');
+    assert.equal((await patch(path, 'profile-farmer', { nickname: 'Farmer', address: '' })).address, null);
+  });
+
   await suite.test('password reset emails are scoped to the sandbox demo and links are single use', async (context) => {
     const demo = { email: 'reset-' + runId + '@example.com', password: 'original-test-password' };
     const environment = {

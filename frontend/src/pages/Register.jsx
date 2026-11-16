@@ -34,8 +34,7 @@ export default function Register() {
     
     try {
       await api.post('/auth/register', { email, password, roles });
-      // Auto-approve means we can just navigate to login
-      navigate('/login');
+      navigate('/login?registered=1', { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
     }

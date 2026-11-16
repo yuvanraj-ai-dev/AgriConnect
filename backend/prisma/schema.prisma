@@ -10,6 +10,8 @@ datasource db {
 model User {
   id               String            @id @default(uuid())
   email            String            @unique
+  nickname         String?
+  address          String?
   passwordHash     String
   roles            String[]
   active           Boolean           @default(true)

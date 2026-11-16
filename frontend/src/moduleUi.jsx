@@ -47,6 +47,18 @@ export function Field({ label, children }) {
   return <label className="module-field"><span>{label}</span>{children}</label>;
 }
 
+export function AddressField({ label, savedAddress, multiline, ...props }) {
+  const input = useRef(null);
+  const Input = multiline ? 'textarea' : 'input';
+  return <div className="space-y-1">
+    <Field label={label}><Input ref={input} {...props} /></Field>
+    {savedAddress && <button type="button" className="text-sm font-semibold text-agriGreen underline" onClick={() => {
+      input.current.value = multiline ? savedAddress : savedAddress.replace(/\s+/g, ' ');
+      input.current.focus();
+    }}>Use saved address</button>}
+  </div>;
+}
+
 export function ErrorMessage({ children }) {
   return children ? <p role="alert" className="rounded-md bg-red-50 p-3 font-medium text-red-900">{children}</p> : null;
 }

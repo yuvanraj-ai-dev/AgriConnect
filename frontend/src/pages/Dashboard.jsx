@@ -28,7 +28,7 @@ export default function Dashboard({ user }) {
     <div className="mx-auto max-w-6xl space-y-5 py-6">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-agriBorder pb-5">
         <div>
-          <h1 className="text-3xl font-bold">Welcome, {user.email.split('@')[0]}</h1>
+          <h1 className="text-3xl font-bold">Welcome, {user.nickname || user.email.split('@')[0]}</h1>
           {role && <p className="mt-1 font-semibold text-agriGreen">{role.replaceAll('_', ' ')} dashboard</p>}
         </div>
         {user.roles.length > 1 && <Field label="Switch view">

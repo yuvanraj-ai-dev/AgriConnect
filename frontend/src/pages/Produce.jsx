@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { dateLabel, ErrorMessage, Field, formValues, ModulePage, Panel, PhotoUpload, QueryState, rupees, Status, timeLabel, useAction, useQuery } from '../moduleUi';
+import { AddressField, dateLabel, ErrorMessage, Field, formValues, ModulePage, Panel, PhotoUpload, QueryState, rupees, Status, timeLabel, useAction, useQuery } from '../moduleUi';
 
 function Batch({ listing, children }) {
   return <Panel>
@@ -100,7 +100,7 @@ function BuyForm({ listing, buy, offer, busy }) {
   </form>;
 }
 
-export default function Produce({ view }) {
+export default function Produce({ view, savedAddress }) {
   const [search, setSearch] = useState('');
   const [photo, setPhoto] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -147,7 +147,7 @@ export default function Produce({ view }) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Crop or variety"><input name="crop" required maxLength="200" /></Field>
           <Field label="Grade"><input name="grade" required maxLength="200" /></Field>
-          <Field label="Pickup location"><input name="location" required maxLength="500" /></Field>
+          <AddressField label="Pickup location" name="location" savedAddress={savedAddress} required maxLength="500" />
           <Field label="Quantity (quintals)"><input name="quantity" type="number" min="0.01" step="0.01" required /></Field>
           <Field label="Minimum batch (quintals)"><input name="minBatch" type="number" min="0.01" step="0.01" required /></Field>
           <Field label="Asking price per quintal (₹)"><input name="basePrice" type="number" min="0.01" step="0.01" required /></Field>

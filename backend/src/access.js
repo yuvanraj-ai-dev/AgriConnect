@@ -5,6 +5,7 @@ const PUBLIC_ROLES = ['FARMER', 'LABOURER', 'VENDOR', 'TEST_CENTER', 'BUYER'];
 const BUILT_IN_ROLES = [...PUBLIC_ROLES, 'ADMIN'];
 const SESSION_LENGTH = 60 * 60 * 1000;
 const userSelect = { id: true, email: true, roles: true, active: true };
+const profileSelect = { nickname: true, address: true };
 
 async function effectiveRoles(roles) {
   const builtIns = roles.filter((role) => BUILT_IN_ROLES.includes(role));
@@ -30,4 +31,4 @@ function credentials(body) {
   return { email: emailAddress(body.email), password: newPassword(body.password) };
 }
 
-module.exports = { PUBLIC_ROLES, BUILT_IN_ROLES, SESSION_LENGTH, userSelect, effectiveRoles, credentials, emailAddress, newPassword };
+module.exports = { PUBLIC_ROLES, BUILT_IN_ROLES, SESSION_LENGTH, userSelect, profileSelect, effectiveRoles, credentials, emailAddress, newPassword };
